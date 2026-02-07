@@ -1,8 +1,14 @@
 """Base model with common fields."""
 from datetime import datetime
-from sqlalchemy import Column, DateTime
+from sqlalchemy import Column, DateTime, JSON
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.ext.declarative import declared_attr
 from app.database import Base
+
+
+# JSON type that works with both PostgreSQL and SQLite
+# Use JSONB for PostgreSQL and JSON for SQLite
+JSONType = JSON().with_variant(JSONB(), "postgresql")
 
 
 class TimestampMixin:
