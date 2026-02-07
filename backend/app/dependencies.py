@@ -6,7 +6,7 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from app.database import get_db
-from app.models import User, Workspace, WorkspaceMember, WorkspaceRole
+from app.models import User, WorkspaceMember, WorkspaceRole
 from app.utils.security import decode_token
 
 security = HTTPBearer()

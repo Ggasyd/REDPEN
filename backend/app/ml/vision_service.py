@@ -1,7 +1,6 @@
 """Vision service using GPT-4o-mini and Gemini 1.5 Flash for semantic analysis."""
 import base64
 from typing import List, Dict
-import httpx
 from openai import AsyncOpenAI
 import google.generativeai as genai
 from app.config import settings

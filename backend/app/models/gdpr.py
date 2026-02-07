@@ -1,5 +1,5 @@
 """GDPR and data retention models."""
-from sqlalchemy import Column, String, ForeignKey, Integer, Boolean, DateTime, Enum as SQLEnum
+from sqlalchemy import Column, ForeignKey, Integer, Boolean, DateTime, Enum as SQLEnum
 from sqlalchemy.dialects.postgresql import UUID
 from app.models.base import JSONType
 from sqlalchemy.orm import relationship

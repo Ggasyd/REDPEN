@@ -1,10 +1,8 @@
 """Celery tasks for async processing."""
 import asyncio
-from typing import Optional
 from uuid import UUID
 from datetime import datetime, timedelta
 from app.workers import celery_app
-from app.config import settings
 
 
 def get_async_db():
@@ -38,9 +36,8 @@ def process_submission_task(self, submission_id: str):
 async def process_submission_async(submission_id: str):
     """Async processing logic for submission."""
     from sqlalchemy import select
-    from app.models import Submission, SubmissionPage, AnswerBlock, GradeDecision
-    from app.models.enums import SubmissionStatus, BlockType, AssignMethod
-    from app.utils.storage import storage
+    from app.models import Submission
+    from app.models.enums import SubmissionStatus
     from app.ml.pipeline import process_submission_pipeline
 
     async with get_async_db() as db:

@@ -1,5 +1,5 @@
 """Workspaces routes."""
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from typing import List
@@ -7,7 +7,7 @@ from app.database import get_db
 from app.models import User, Workspace, WorkspaceMember, WorkspaceSettings
 from app.models.enums import WorkspaceRole
 from app.schemas.workspace import WorkspaceCreate, WorkspaceResponse
-from app.dependencies import get_current_user, require_owner
+from app.dependencies import get_current_user
 from app.config import settings
 
 router = APIRouter()

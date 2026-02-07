@@ -1,9 +1,7 @@
 """Seed database with demo data."""
 import asyncio
-from datetime import datetime
-from uuid import UUID
 from sqlalchemy import select
-from app.database import AsyncSessionLocal, init_db
+from app.database import AsyncSessionLocal
 from app.models import (
     User,
     Workspace,
@@ -197,11 +195,11 @@ async def seed_database():
 
         print("✅ Database seeded successfully!")
         print("\n📊 Demo Data Created:")
-        print(f"   - User: prof@redpen.fr (password: password123)")
-        print(f"   - Workspaces: 2 (Personal + School)")
-        print(f"   - Classroom: Terminale S1")
+        print("   - User: prof@redpen.fr (password: password123)")
+        print("   - Workspaces: 2 (Personal + School)")
+        print("   - Classroom: Terminale S1")
         print(f"   - Students: {len(students_data)}")
-        print(f"   - Exam: Contrôle de Mathématiques - Analyse")
+        print("   - Exam: Contrôle de Mathématiques - Analyse")
         print(f"   - Questions: {len(questions_data)}")
 
 

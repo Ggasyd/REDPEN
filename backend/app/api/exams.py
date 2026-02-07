@@ -1,5 +1,5 @@
 """Exams routes - simplified for MVP."""
-from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from typing import List
@@ -9,7 +9,6 @@ from app.database import get_db
 from app.models import Exam, ExamVersion, Question, WorkspaceMember
 from app.models.enums import QuestionType
 from app.dependencies import get_workspace_id, require_teacher
-from app.utils.storage import storage
 
 router = APIRouter()
 

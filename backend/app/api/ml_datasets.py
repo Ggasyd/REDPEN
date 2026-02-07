@@ -1,10 +1,10 @@
 """ML datasets export routes."""
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from uuid import UUID
 from app.database import get_db
-from app.models import AnswerBlockLabel, StudentAssignmentLabel, PreferenceSample, WorkspaceMember
+from app.models import AnswerBlockLabel, PreferenceSample, WorkspaceMember
 from app.dependencies import get_workspace_id, require_admin
 
 router = APIRouter()

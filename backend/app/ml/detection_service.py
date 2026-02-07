@@ -1,7 +1,7 @@
 """Detection service for MCQ and tables (deterministic, pixel-based)."""
 import cv2
 import numpy as np
-from typing import List, Dict, Optional
+from typing import List, Dict
 
 
 class DetectionService:

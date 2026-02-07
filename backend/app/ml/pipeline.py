@@ -23,8 +23,6 @@ from app.utils.fuzzy_matching import fuzzy_match_student
 from app.ml.ocr_service import ocr_service
 from app.ml.vision_service import vision_service
 from app.ml.detection_service import detection_service
-import io
-from PIL import Image
 
 
 async def process_submission_pipeline(submission: Submission, db: AsyncSession):
