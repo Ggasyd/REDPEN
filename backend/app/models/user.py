@@ -3,9 +3,9 @@
 import uuid
 
 from sqlalchemy import Boolean, Column, String
-from app.models.base import GUID as UUID
 from sqlalchemy.orm import relationship
 
+from app.models.base import GUID as UUID
 from app.models.base import BaseModel
 
 

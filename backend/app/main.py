@@ -68,7 +68,7 @@ from app.api import (
     review,
     submissions,
     workspaces,
-)  # noqa: E402
+)
 
 app.include_router(auth.router, prefix="/api/auth", tags=["Authentication"])
 app.include_router(workspaces.router, prefix="/api/workspaces", tags=["Workspaces"])

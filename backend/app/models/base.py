@@ -3,8 +3,9 @@
 from datetime import datetime
 from uuid import UUID as PyUUID
 
-from sqlalchemy import JSON, Column, DateTime, TypeDecorator, String
-from sqlalchemy.dialects.postgresql import JSONB, UUID as PG_UUID
+from sqlalchemy import JSON, Column, DateTime, String, TypeDecorator
+from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.ext.declarative import declared_attr
 
 from app.database import Base
@@ -13,7 +14,7 @@ from app.database import Base
 # UUID type that works with both PostgreSQL and SQLite
 class GUID(TypeDecorator):
     """Platform-independent GUID type.
-    
+
     Uses PostgreSQL's UUID type, otherwise uses CHAR(36).
     """
     impl = String(36)

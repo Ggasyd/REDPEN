@@ -15,9 +15,9 @@ from sqlalchemy import (
 from sqlalchemy import (
     Enum as SQLEnum,
 )
-from app.models.base import GUID as UUID
 from sqlalchemy.orm import relationship
 
+from app.models.base import GUID as UUID
 from app.models.base import BaseModel, JSONType
 from app.models.enums import (
     AssignMethod,
