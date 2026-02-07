@@ -57,7 +57,7 @@ Return a JSON list with: question_number, estimated_position (top/middle/bottom)
 NEVER grade or correct, only classify!"""
 
         try:
-            response = await self.openai_client.chat.completions.create(
+            _ = await self.openai_client.chat.completions.create(
                 model=self.openai_model,
                 messages=[
                     {
@@ -123,7 +123,7 @@ Possible students: {students_text}
 Return ONLY the matching student name from the list, or 'UNKNOWN' if not found."""
 
         try:
-            response = await self.openai_client.chat.completions.create(
+            _ = await self.openai_client.chat.completions.create(
                 model=self.openai_model,
                 messages=[
                     {
