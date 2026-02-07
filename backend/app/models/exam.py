@@ -1,6 +1,7 @@
 """Exam and related models."""
 from sqlalchemy import Column, String, ForeignKey, Integer, Text, Float, Enum as SQLEnum, Boolean
-from sqlalchemy.dialects.postgresql import UUID, JSONB
+from sqlalchemy.dialects.postgresql import UUID
+from app.models.base import JSONType
 from sqlalchemy.orm import relationship
 import uuid
 from app.models.base import BaseModel
@@ -79,7 +80,7 @@ class RubricDocument(BaseModel):
     original_filename = Column(String(500), nullable=False)
     storage_url = Column(String(1000), nullable=False)
     extracted_text = Column(Text, nullable=True)
-    metadata_json = Column(JSONB, nullable=True)
+    metadata_json = Column(JSONType, nullable=True)
 
     # Relationships
     exam_version = relationship("ExamVersion", back_populates="rubric_document")
@@ -109,7 +110,7 @@ class Question(BaseModel):
 
     # For MCQ
     correct_answer = Column(String(10), nullable=True)  # e.g., "A", "B", "C"
-    mcq_options = Column(JSONB, nullable=True)  # {"A": "text", "B": "text", ...}
+    mcq_options = Column(JSONType, nullable=True)  # {"A": "text", "B": "text", ...}
 
     # Relationships
     exam_version = relationship("ExamVersion", back_populates="questions")

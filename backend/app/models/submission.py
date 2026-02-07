@@ -1,6 +1,7 @@
 """Submission and related models."""
 from sqlalchemy import Column, String, ForeignKey, Integer, Text, Float, Enum as SQLEnum, Boolean, DateTime
-from sqlalchemy.dialects.postgresql import UUID, JSONB
+from sqlalchemy.dialects.postgresql import UUID
+from app.models.base import JSONType
 from sqlalchemy.orm import relationship
 import uuid
 from app.models.base import BaseModel
@@ -149,7 +150,7 @@ class AnswerBlock(BaseModel):
     is_manually_edited = Column(Boolean, default=False, nullable=False)
 
     # Metadata
-    metadata_json = Column(JSONB, nullable=True)  # Additional data from AI
+    metadata_json = Column(JSONType, nullable=True)  # Additional data from AI
 
     # Relationships
     page = relationship("SubmissionPage", back_populates="answer_blocks")
@@ -237,7 +238,7 @@ class GradeDecision(BaseModel):
     )
 
     # Grading details per question
-    question_scores = Column(JSONB, nullable=True)  # {question_id: {score: X, max: Y}}
+    question_scores = Column(JSONType, nullable=True)  # {question_id: {score: X, max: Y}}
     total_score = Column(Float, nullable=False)
     max_score = Column(Float, nullable=False)
     percentage = Column(Float, nullable=True)
@@ -297,7 +298,7 @@ class AnnotatedArtifact(BaseModel):
     )
     artifact_type = Column(String(50), nullable=False)
     storage_url = Column(String(1000), nullable=False)
-    metadata_json = Column(JSONB, nullable=True)
+    metadata_json = Column(JSONType, nullable=True)
 
     # Relationships
     submission = relationship("Submission", back_populates="artifacts")

@@ -1,6 +1,7 @@
 """Machine Learning and Human-in-the-Loop models."""
 from sqlalchemy import Column, String, ForeignKey, Text, Float, Boolean, Enum as SQLEnum
-from sqlalchemy.dialects.postgresql import UUID, JSONB
+from sqlalchemy.dialects.postgresql import UUID
+from app.models.base import JSONType
 from sqlalchemy.orm import relationship
 import uuid
 from app.models.base import BaseModel
@@ -94,10 +95,10 @@ class PreferenceSample(BaseModel):
     )
 
     # AI output
-    ai_output = Column(JSONB, nullable=False)  # {score, feedback, justification}
+    ai_output = Column(JSONType, nullable=False)  # {score, feedback, justification}
 
     # Human decision
-    human_decision = Column(JSONB, nullable=False)  # {score, feedback, changes}
+    human_decision = Column(JSONType, nullable=False)  # {score, feedback, changes}
 
     # Preference (was AI accepted?)
     ai_accepted = Column(Boolean, nullable=False)
@@ -124,14 +125,14 @@ class CalibrationRecord(BaseModel):
     # AI prediction
     prediction_type = Column(String(100), nullable=False)  # transcription, assignment, grade
     ai_confidence = Column(Float, nullable=False)
-    ai_output = Column(JSONB, nullable=False)
+    ai_output = Column(JSONType, nullable=False)
 
     # Human validation
     was_correct = Column(Boolean, nullable=False)
     human_feedback = Column(Text, nullable=True)
 
     # Context
-    context_metadata = Column(JSONB, nullable=True)
+    context_metadata = Column(JSONType, nullable=True)
 
     # Relationships
     workspace = relationship("Workspace")
@@ -165,11 +166,11 @@ class HumanActionEvent(BaseModel):
     entity_id = Column(UUID(as_uuid=True), nullable=False)
 
     # Before/After
-    before_value = Column(JSONB, nullable=True)
-    after_value = Column(JSONB, nullable=True)
+    before_value = Column(JSONType, nullable=True)
+    after_value = Column(JSONType, nullable=True)
 
     # Context
-    action_metadata = Column(JSONB, nullable=True)
+    action_metadata = Column(JSONType, nullable=True)
 
     # GDPR: can be sanitized
     is_sanitized = Column(Boolean, default=False, nullable=False)
