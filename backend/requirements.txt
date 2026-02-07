@@ -26,7 +26,7 @@ minio==7.2.3
 boto3==1.34.34
 
 # AI/ML Libraries
-openai>=1.99.5
+openai==1.99.9
 google-generativeai>=0.3.2
 mistralai>=0.1.8
 Pillow>=10.2.0
