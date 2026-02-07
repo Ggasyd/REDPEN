@@ -1,6 +1,5 @@
 """Detection service for MCQ and tables (deterministic, pixel-based)."""
 
-
 import cv2
 import numpy as np
 
@@ -8,9 +7,7 @@ import numpy as np
 class DetectionService:
     """Deterministic detection for MCQ marks and tables."""
 
-    def detect_mcq_marks(
-        self, image_bytes: bytes, options: list[str] = None
-    ) -> dict:
+    def detect_mcq_marks(self, image_bytes: bytes, options: list[str] = None) -> dict:
         """Detect marked answer in MCQ using pixel density analysis.
 
         Args:

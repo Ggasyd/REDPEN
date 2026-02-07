@@ -1,6 +1,5 @@
 """Fuzzy matching utilities for student name matching."""
 
-
 from fuzzywuzzy import fuzz, process
 
 

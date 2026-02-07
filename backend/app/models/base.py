@@ -17,11 +17,12 @@ class GUID(TypeDecorator):
 
     Uses PostgreSQL's UUID type, otherwise uses CHAR(36).
     """
+
     impl = String(36)
     cache_ok = True
 
     def load_dialect_impl(self, dialect):
-        if dialect.name == 'postgresql':
+        if dialect.name == "postgresql":
             return dialect.type_descriptor(PG_UUID(as_uuid=True))
         else:
             return dialect.type_descriptor(String(36))
@@ -29,7 +30,7 @@ class GUID(TypeDecorator):
     def process_bind_param(self, value, dialect):
         if value is None:
             return value
-        elif dialect.name == 'postgresql':
+        elif dialect.name == "postgresql":
             return str(value) if isinstance(value, PyUUID) else value
         else:
             return str(value) if isinstance(value, PyUUID) else value
