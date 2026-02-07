@@ -123,7 +123,7 @@ Possible students: {students_text}
 Return ONLY the matching student name from the list, or 'UNKNOWN' if not found."""
 
         try:
-            _ = await self.openai_client.chat.completions.create(
+            response = await self.openai_client.chat.completions.create(
                 model=self.openai_model,
                 messages=[
                     {
