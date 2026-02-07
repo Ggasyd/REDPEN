@@ -56,8 +56,10 @@ Correction de copies augmentées par IA
 
 ### Prérequis
 
-- Docker & Docker Compose
+- Docker (avec Docker Compose v2 intégré)
 - Make (optionnel mais recommandé)
+
+> **Note**: Docker Compose v2 est maintenant intégré dans Docker CLI. Utilisez `docker compose` au lieu de `docker-compose`.
 
 ### Installation
 
