@@ -304,6 +304,3 @@ async def flag_for_review_if_needed(submission: Submission, db: AsyncSession):
     else:
         submission.status = SubmissionStatus.PROCESSED
 
-
-# Import missing models
-from app.models import ExamVersion
