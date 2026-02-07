@@ -1,7 +1,6 @@
 """Complete submission processing pipeline (3 pillars)."""
 from typing import List, Dict
 from uuid import UUID
-from datetime import timedelta
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from app.models import (
