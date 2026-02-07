@@ -79,7 +79,7 @@ class RubricDocument(BaseModel):
     original_filename = Column(String(500), nullable=False)
     storage_url = Column(String(1000), nullable=False)
     extracted_text = Column(Text, nullable=True)
-    metadata = Column(JSONB, nullable=True)
+    metadata_json = Column(JSONB, nullable=True)
 
     # Relationships
     exam_version = relationship("ExamVersion", back_populates="rubric_document")
