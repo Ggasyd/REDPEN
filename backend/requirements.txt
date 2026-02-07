@@ -31,7 +31,7 @@ google-generativeai==0.3.2
 mistralai==0.1.8
 Pillow==10.2.0
 pytesseract==0.3.10
-opencv-python==4.9.0.80
+opencv-python-headless==4.9.0.80
 numpy==1.26.3
 
 # PDF Processing
