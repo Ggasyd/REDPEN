@@ -1,4 +1,5 @@
 """Database configuration and session management."""
+
 from typing import AsyncGenerator
 from sqlalchemy.ext.asyncio import (
     AsyncSession,
@@ -9,9 +10,7 @@ from sqlalchemy.orm import declarative_base
 from app.config import settings
 
 # Convert PostgreSQL URL to async version
-DATABASE_URL = settings.database_url.replace(
-    "postgresql://", "postgresql+asyncpg://"
-)
+DATABASE_URL = settings.database_url.replace("postgresql://", "postgresql+asyncpg://")
 
 # Create async engine
 engine = create_async_engine(

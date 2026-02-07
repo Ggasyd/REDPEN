@@ -1,4 +1,5 @@
 """Workspace schemas."""
+
 from pydantic import BaseModel, Field
 from datetime import datetime
 from app.models.enums import WorkspaceType, WorkspaceRole

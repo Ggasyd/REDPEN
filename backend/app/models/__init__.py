@@ -1,4 +1,5 @@
 """Models package - imports all models for Alembic autogeneration."""
+
 from app.models.base import Base, BaseModel, TimestampMixin
 from app.models.enums import (
     WorkspaceType,

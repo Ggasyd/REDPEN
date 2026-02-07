@@ -1,4 +1,5 @@
 """FastAPI dependencies for authentication and multi-tenancy."""
+
 from typing import Optional
 from uuid import UUID
 from fastapi import Depends, HTTPException, Header, status

@@ -1,4 +1,5 @@
 """Exams routes - simplified for MVP."""
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
@@ -91,9 +92,7 @@ async def create_exam_version(
         raise HTTPException(status_code=404, detail="Exam not found")
 
     # Count existing versions
-    result = await db.execute(
-        select(ExamVersion).where(ExamVersion.exam_id == exam_id)
-    )
+    result = await db.execute(select(ExamVersion).where(ExamVersion.exam_id == exam_id))
     versions = result.scalars().all()
     new_version_number = len(versions) + 1
 

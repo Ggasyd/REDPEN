@@ -1,4 +1,5 @@
 """FastAPI application main entry point."""
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
@@ -56,7 +57,16 @@ async def root():
 
 
 # Import and include routers
-from app.api import auth, workspaces, classrooms, exams, submissions, review, gdpr, ml_datasets  # noqa: E402
+from app.api import (
+    auth,
+    workspaces,
+    classrooms,
+    exams,
+    submissions,
+    review,
+    gdpr,
+    ml_datasets,
+)  # noqa: E402
 
 app.include_router(auth.router, prefix="/api/auth", tags=["Authentication"])
 app.include_router(workspaces.router, prefix="/api/workspaces", tags=["Workspaces"])
@@ -66,4 +76,3 @@ app.include_router(submissions.router, prefix="/api/submissions", tags=["Submiss
 app.include_router(review.router, prefix="/api/review", tags=["Review"])
 app.include_router(gdpr.router, prefix="/api/gdpr", tags=["GDPR"])
 app.include_router(ml_datasets.router, prefix="/api/ml", tags=["ML Datasets"])
-

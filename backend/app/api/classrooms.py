@@ -1,4 +1,5 @@
 """Classrooms routes."""
+
 from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
@@ -88,7 +89,7 @@ async def import_students(
     db: AsyncSession = Depends(get_db),
 ):
     """Import students from CSV/Excel/PDF.
-    
+
     Stub: For MVP, expects CSV with columns: first_name, last_name, student_number, email
     """
     # Verify classroom belongs to workspace
@@ -108,6 +109,7 @@ async def import_students(
     if file.filename.endswith(".csv"):
         import csv
         import io
+
         reader = csv.DictReader(io.StringIO(content.decode()))
         students_data = list(reader)
     else:

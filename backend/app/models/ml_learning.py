@@ -1,4 +1,5 @@
 """Machine Learning and Human-in-the-Loop models."""
+
 from sqlalchemy import Column, String, ForeignKey, Text, Float, Boolean, Enum as SQLEnum
 from sqlalchemy.dialects.postgresql import UUID
 from app.models.base import JSONType
@@ -123,7 +124,9 @@ class CalibrationRecord(BaseModel):
     )
 
     # AI prediction
-    prediction_type = Column(String(100), nullable=False)  # transcription, assignment, grade
+    prediction_type = Column(
+        String(100), nullable=False
+    )  # transcription, assignment, grade
     ai_confidence = Column(Float, nullable=False)
     ai_output = Column(JSONType, nullable=False)
 

@@ -1,4 +1,5 @@
 """Celery app configuration."""
+
 from celery import Celery
 from celery.schedules import crontab
 from app.config import settings

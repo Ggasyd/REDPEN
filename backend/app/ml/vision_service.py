@@ -1,4 +1,5 @@
 """Vision service using GPT-4o-mini and Gemini 1.5 Flash for semantic analysis."""
+
 import base64
 from typing import List, Dict
 from openai import AsyncOpenAI
@@ -36,7 +37,9 @@ class VisionService:
         else:
             return await self._classify_with_gpt(image_bytes, questions)
 
-    async def _classify_with_gpt(self, image_bytes: bytes, questions: List[Dict]) -> List[Dict]:
+    async def _classify_with_gpt(
+        self, image_bytes: bytes, questions: List[Dict]
+    ) -> List[Dict]:
         """Classify using GPT-4o-mini (vision)."""
         # Encode image
         image_base64 = base64.b64encode(image_bytes).decode("utf-8")
@@ -93,7 +96,9 @@ NEVER grade or correct, only classify!"""
             # Fallback to Gemini
             return await self._classify_with_gemini(image_bytes, questions)
 
-    async def _classify_with_gemini(self, image_bytes: bytes, questions: List[Dict]) -> List[Dict]:
+    async def _classify_with_gemini(
+        self, image_bytes: bytes, questions: List[Dict]
+    ) -> List[Dict]:
         """Classify using Gemini 1.5 Flash (fallback)."""
         # Stub: Similar to GPT but with Gemini API
         # For MVP, return mock data

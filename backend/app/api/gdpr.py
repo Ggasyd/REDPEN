@@ -1,4 +1,5 @@
 """GDPR and retention routes."""
+
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
@@ -109,6 +110,7 @@ async def run_retention_enforcement(
 
     # Trigger async task
     from app.workers.tasks import retention_enforcement_task
+
     retention_enforcement_task.delay(str(run.id))
 
     return {

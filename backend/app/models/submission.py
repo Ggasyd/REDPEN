@@ -1,11 +1,27 @@
 """Submission and related models."""
-from sqlalchemy import Column, String, ForeignKey, Integer, Text, Float, Enum as SQLEnum, Boolean, DateTime
+
+from sqlalchemy import (
+    Column,
+    String,
+    ForeignKey,
+    Integer,
+    Text,
+    Float,
+    Enum as SQLEnum,
+    Boolean,
+    DateTime,
+)
 from sqlalchemy.dialects.postgresql import UUID
 from app.models.base import JSONType
 from sqlalchemy.orm import relationship
 import uuid
 from app.models.base import BaseModel
-from app.models.enums import SubmissionStatus, BlockType, AssignMethod, StudentAssignMethod
+from app.models.enums import (
+    SubmissionStatus,
+    BlockType,
+    AssignMethod,
+    StudentAssignMethod,
+)
 
 
 class Submission(BaseModel):
@@ -32,7 +48,9 @@ class Submission(BaseModel):
         nullable=True,
         index=True,
     )
-    candidate_name = Column(String(500), nullable=True)  # Free-form name if no student_id
+    candidate_name = Column(
+        String(500), nullable=True
+    )  # Free-form name if no student_id
 
     # Processing
     status = Column(
@@ -238,7 +256,9 @@ class GradeDecision(BaseModel):
     )
 
     # Grading details per question
-    question_scores = Column(JSONType, nullable=True)  # {question_id: {score: X, max: Y}}
+    question_scores = Column(
+        JSONType, nullable=True
+    )  # {question_id: {score: X, max: Y}}
     total_score = Column(Float, nullable=False)
     max_score = Column(Float, nullable=False)
     percentage = Column(Float, nullable=True)

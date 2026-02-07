@@ -1,4 +1,5 @@
 """OCR service using Mistral OCR (Pixtral)."""
+
 import base64
 from typing import List, Dict, Optional
 import httpx
@@ -14,7 +15,9 @@ class OCRService:
         self.base_url = "https://api.mistral.ai/v1/chat/completions"
 
     async def extract_text_from_image(
-        self, image_bytes: bytes, prompt: str = "Extract all text from this image verbatim."
+        self,
+        image_bytes: bytes,
+        prompt: str = "Extract all text from this image verbatim.",
     ) -> Dict:
         """Extract text from image using Mistral OCR.
 
@@ -60,9 +63,7 @@ class OCRService:
             "blocks": [],  # Would need layout analysis
         }
 
-    async def extract_layout(
-        self, image_bytes: bytes
-    ) -> List[Dict]:
+    async def extract_layout(self, image_bytes: bytes) -> List[Dict]:
         """Extract layout and text blocks (horizontal slices for geometric pillar).
 
         Returns:

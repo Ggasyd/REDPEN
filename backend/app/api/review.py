@@ -1,4 +1,5 @@
 """Review routes - for correcting submissions."""
+
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
@@ -6,7 +7,13 @@ from typing import List
 from uuid import UUID
 from pydantic import BaseModel
 from app.database import get_db
-from app.models import Submission, AnswerBlock, GradeDecision, WorkspaceMember, SubmissionPage
+from app.models import (
+    Submission,
+    AnswerBlock,
+    GradeDecision,
+    WorkspaceMember,
+    SubmissionPage,
+)
 from app.dependencies import get_workspace_id, require_teacher
 
 router = APIRouter()
@@ -34,7 +41,10 @@ class GradeDecisionUpdate(BaseModel):
     teacher_notes: str | None = None
 
 
-@router.get("/submissions/{submission_id}/answer_blocks", response_model=List[AnswerBlockResponse])
+@router.get(
+    "/submissions/{submission_id}/answer_blocks",
+    response_model=List[AnswerBlockResponse],
+)
 async def get_answer_blocks(
     submission_id: UUID,
     workspace_id: UUID = Depends(get_workspace_id),
@@ -54,6 +64,7 @@ async def get_answer_blocks(
 
     # Get answer blocks through pages
     from app.models import SubmissionPage
+
     result = await db.execute(
         select(AnswerBlock)
         .join(SubmissionPage)

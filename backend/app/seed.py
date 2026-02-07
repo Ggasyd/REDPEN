@@ -1,4 +1,5 @@
 """Seed database with demo data."""
+
 import asyncio
 from sqlalchemy import select
 from app.database import AsyncSessionLocal

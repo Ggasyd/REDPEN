@@ -1,4 +1,5 @@
 """Authentication routes."""
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
@@ -24,7 +25,9 @@ from app.dependencies import get_current_user
 router = APIRouter()
 
 
-@router.post("/register", response_model=TokenResponse, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/register", response_model=TokenResponse, status_code=status.HTTP_201_CREATED
+)
 async def register(user_data: UserRegister, db: AsyncSession = Depends(get_db)):
     """Register a new user and create personal workspace."""
     # Check if user already exists
@@ -123,6 +126,7 @@ async def refresh(token_data: RefreshTokenRequest, db: AsyncSession = Depends(ge
 
     # Verify user exists and is active
     from uuid import UUID
+
     result = await db.execute(select(User).where(User.id == UUID(user_id)))
     user = result.scalar_one_or_none()
 

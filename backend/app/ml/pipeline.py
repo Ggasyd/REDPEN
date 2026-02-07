@@ -1,4 +1,5 @@
 """Complete submission processing pipeline (3 pillars)."""
+
 from typing import List, Dict
 from uuid import UUID
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -56,7 +57,9 @@ async def process_submission_pipeline(submission: Submission, db: AsyncSession):
     await flag_for_review_if_needed(submission, db)
 
 
-async def split_pdf_to_pages(submission: Submission, db: AsyncSession) -> List[SubmissionPage]:
+async def split_pdf_to_pages(
+    submission: Submission, db: AsyncSession
+) -> List[SubmissionPage]:
     """Split PDF into individual pages.
 
     Stub: In production, use PyPDF2 and pdf2image.
@@ -131,7 +134,9 @@ async def process_page(page: SubmissionPage, submission: Submission, db: AsyncSe
     await db.flush()
 
 
-async def extract_geometric_blocks(page_bytes: bytes, questions: List[Question]) -> List[Dict]:
+async def extract_geometric_blocks(
+    page_bytes: bytes, questions: List[Question]
+) -> List[Dict]:
     """Pillar 1: Geometric extraction using OCR layout analysis."""
     try:
         layout = await ocr_service.extract_layout(page_bytes)
@@ -141,15 +146,17 @@ async def extract_geometric_blocks(page_bytes: bytes, questions: List[Question])
             # Assign to question based on order
             question_id = questions[i].id if i < len(questions) else None
 
-            blocks.append({
-                "question_id": question_id,
-                "block_type": BlockType.TEXT,
-                "assign_method": AssignMethod.GEOMETRIC,
-                "bbox": block_data.get("bbox", [0, 0, 100, 100]),
-                "transcription": block_data.get("text", ""),
-                "crop_url": "mock_crop_url",  # In production, save actual crop
-                "confidence": block_data.get("confidence", 0.9),
-            })
+            blocks.append(
+                {
+                    "question_id": question_id,
+                    "block_type": BlockType.TEXT,
+                    "assign_method": AssignMethod.GEOMETRIC,
+                    "bbox": block_data.get("bbox", [0, 0, 100, 100]),
+                    "transcription": block_data.get("text", ""),
+                    "crop_url": "mock_crop_url",  # In production, save actual crop
+                    "confidence": block_data.get("confidence", 0.9),
+                }
+            )
 
         return blocks
     except Exception as e:
@@ -157,7 +164,9 @@ async def extract_geometric_blocks(page_bytes: bytes, questions: List[Question])
         return []
 
 
-async def extract_semantic_blocks(page_bytes: bytes, questions: List[Question]) -> List[Dict]:
+async def extract_semantic_blocks(
+    page_bytes: bytes, questions: List[Question]
+) -> List[Dict]:
     """Pillar 2: Semantic extraction using vision models."""
     try:
         questions_data = [
@@ -165,19 +174,27 @@ async def extract_semantic_blocks(page_bytes: bytes, questions: List[Question]) 
             for q in questions
         ]
 
-        classifications = await vision_service.classify_answer_blocks(page_bytes, questions_data)
+        classifications = await vision_service.classify_answer_blocks(
+            page_bytes, questions_data
+        )
 
         blocks = []
         for classification in classifications:
-            blocks.append({
-                "question_id": UUID(classification["question_id"]) if classification.get("question_id") else None,
-                "block_type": BlockType.TEXT,
-                "assign_method": AssignMethod.SEMANTIC,
-                "bbox": classification.get("bbox", [0, 0, 100, 100]),
-                "transcription": "",  # Will be filled by OCR
-                "crop_url": "mock_crop_url",
-                "confidence": classification.get("confidence", 0.85),
-            })
+            blocks.append(
+                {
+                    "question_id": (
+                        UUID(classification["question_id"])
+                        if classification.get("question_id")
+                        else None
+                    ),
+                    "block_type": BlockType.TEXT,
+                    "assign_method": AssignMethod.SEMANTIC,
+                    "bbox": classification.get("bbox", [0, 0, 100, 100]),
+                    "transcription": "",  # Will be filled by OCR
+                    "crop_url": "mock_crop_url",
+                    "confidence": classification.get("confidence", 0.85),
+                }
+            )
 
         return blocks
     except Exception as e:
@@ -185,10 +202,13 @@ async def extract_semantic_blocks(page_bytes: bytes, questions: List[Question]) 
         return []
 
 
-async def extract_detection_blocks(page_bytes: bytes, questions: List[Question]) -> List[Dict]:
+async def extract_detection_blocks(
+    page_bytes: bytes, questions: List[Question]
+) -> List[Dict]:
     """Pillar 3: Detection-based extraction for MCQ/tables."""
     # Filter MCQ questions
     from app.models.enums import QuestionType
+
     mcq_questions = [q for q in questions if q.question_type == QuestionType.MCQ]
 
     blocks = []
@@ -196,15 +216,17 @@ async def extract_detection_blocks(page_bytes: bytes, questions: List[Question])
         # Stub: In production, crop MCQ region and detect
         try:
             result = detection_service.detect_mcq_marks(page_bytes)
-            blocks.append({
-                "question_id": question.id,
-                "block_type": BlockType.MCQ,
-                "assign_method": AssignMethod.DETECTION,
-                "bbox": [0, 0, 100, 100],
-                "transcription": result.get("detected_answer", "UNKNOWN"),
-                "crop_url": "mock_crop_url",
-                "confidence": result.get("confidence", 0.0),
-            })
+            blocks.append(
+                {
+                    "question_id": question.id,
+                    "block_type": BlockType.MCQ,
+                    "assign_method": AssignMethod.DETECTION,
+                    "bbox": [0, 0, 100, 100],
+                    "transcription": result.get("detected_answer", "UNKNOWN"),
+                    "crop_url": "mock_crop_url",
+                    "confidence": result.get("confidence", 0.0),
+                }
+            )
         except Exception as e:
             print(f"Detection error for question {question.id}: {e}")
 
@@ -247,7 +269,9 @@ async def assign_student_to_submission(submission: Submission, db: AsyncSession)
     # Try fuzzy matching if candidate_name provided
     if submission.candidate_name:
         student_names = [(str(s.id), f"{s.first_name} {s.last_name}") for s in students]
-        match = fuzzy_match_student(submission.candidate_name, student_names, threshold=80)
+        match = fuzzy_match_student(
+            submission.candidate_name, student_names, threshold=80
+        )
 
         if match:
             student_id, matched_name, score = match
@@ -302,4 +326,3 @@ async def flag_for_review_if_needed(submission: Submission, db: AsyncSession):
         submission.status = SubmissionStatus.NEEDS_REVIEW
     else:
         submission.status = SubmissionStatus.PROCESSED
-

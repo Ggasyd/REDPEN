@@ -1,4 +1,5 @@
 """Storage service for MinIO/S3."""
+
 import io
 import os
 from typing import Optional, BinaryIO

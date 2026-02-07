@@ -1,4 +1,5 @@
 """Application configuration using Pydantic Settings."""
+
 import json
 from typing import List
 from pydantic import field_validator
@@ -9,10 +10,7 @@ class Settings(BaseSettings):
     """Application settings loaded from environment variables."""
 
     model_config = SettingsConfigDict(
-        env_file=".env",
-        env_file_encoding="utf-8",
-        case_sensitive=False,
-        extra="ignore"
+        env_file=".env", env_file_encoding="utf-8", case_sensitive=False, extra="ignore"
     )
 
     # Application

@@ -1,5 +1,15 @@
 """Exam and related models."""
-from sqlalchemy import Column, String, ForeignKey, Integer, Text, Float, Enum as SQLEnum, Boolean
+
+from sqlalchemy import (
+    Column,
+    String,
+    ForeignKey,
+    Integer,
+    Text,
+    Float,
+    Enum as SQLEnum,
+    Boolean,
+)
 from sqlalchemy.dialects.postgresql import UUID
 from app.models.base import JSONType
 from sqlalchemy.orm import relationship

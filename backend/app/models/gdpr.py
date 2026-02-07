@@ -1,4 +1,5 @@
 """GDPR and data retention models."""
+
 from sqlalchemy import Column, ForeignKey, Integer, Boolean, DateTime, Enum as SQLEnum
 from sqlalchemy.dialects.postgresql import UUID
 from app.models.base import JSONType
@@ -58,7 +59,9 @@ class DataRetentionRun(BaseModel):
     finished_at = Column(DateTime, nullable=True)
 
     # Results
-    summary_json = Column(JSONType, nullable=True)  # {affected_submissions, artifacts_deleted, etc.}
+    summary_json = Column(
+        JSONType, nullable=True
+    )  # {affected_submissions, artifacts_deleted, etc.}
     error_log = Column(JSONType, nullable=True)
 
     # Relationships

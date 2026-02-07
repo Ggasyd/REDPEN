@@ -1,4 +1,5 @@
 """Fuzzy matching utilities for student name matching."""
+
 from typing import List, Optional, Tuple
 from fuzzywuzzy import fuzz, process
 

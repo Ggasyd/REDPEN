@@ -1,4 +1,5 @@
 """Celery tasks for async processing."""
+
 import asyncio
 from uuid import UUID
 from datetime import datetime, timedelta
@@ -8,10 +9,13 @@ from app.workers import celery_app
 def get_async_db():
     """Get async database session for tasks."""
     from app.database import AsyncSessionLocal
+
     return AsyncSessionLocal()
 
 
-@celery_app.task(name="app.workers.tasks.process_submission_task", bind=True, max_retries=3)
+@celery_app.task(
+    name="app.workers.tasks.process_submission_task", bind=True, max_retries=3
+)
 def process_submission_task(self, submission_id: str):
     """Process a submission asynchronously.
 
@@ -42,7 +46,9 @@ async def process_submission_async(submission_id: str):
 
     async with get_async_db() as db:
         # Get submission
-        result = await db.execute(select(Submission).where(Submission.id == UUID(submission_id)))
+        result = await db.execute(
+            select(Submission).where(Submission.id == UUID(submission_id))
+        )
         submission = result.scalar_one_or_none()
 
         if not submission:
@@ -84,7 +90,9 @@ async def retention_enforcement_async(run_id: str):
 
     async with get_async_db() as db:
         # Get run
-        result = await db.execute(select(DataRetentionRun).where(DataRetentionRun.id == UUID(run_id)))
+        result = await db.execute(
+            select(DataRetentionRun).where(DataRetentionRun.id == UUID(run_id))
+        )
         run = result.scalar_one_or_none()
 
         if not run:
@@ -92,7 +100,9 @@ async def retention_enforcement_async(run_id: str):
 
         # Get workspace settings
         result = await db.execute(
-            select(WorkspaceSettings).where(WorkspaceSettings.workspace_id == run.workspace_id)
+            select(WorkspaceSettings).where(
+                WorkspaceSettings.workspace_id == run.workspace_id
+            )
         )
         settings_obj = result.scalar_one_or_none()
 
@@ -100,7 +110,9 @@ async def retention_enforcement_async(run_id: str):
             raise ValueError(f"Settings not found for workspace {run.workspace_id}")
 
         # Calculate cutoff dates
-        submissions_cutoff = datetime.utcnow() - timedelta(days=settings_obj.retention_submissions_days)
+        submissions_cutoff = datetime.utcnow() - timedelta(
+            days=settings_obj.retention_submissions_days
+        )
 
         # Find expired submissions
         result = await db.execute(

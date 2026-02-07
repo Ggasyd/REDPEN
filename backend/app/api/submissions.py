@@ -1,4 +1,5 @@
 """Submissions routes - simplified for MVP."""
+
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select

@@ -1,4 +1,5 @@
 """Auth schemas."""
+
 from pydantic import BaseModel, EmailStr, Field
 
 
