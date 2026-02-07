@@ -19,10 +19,10 @@ help:
 	@echo "psql        - Open PostgreSQL shell"
 
 build:
-	docker-compose build
+	docker compose build
 
 up:
-	docker-compose up -d
+	docker compose up -d
 	@echo "Waiting for services to start..."
 	@sleep 5
 	@echo "Services are running!"
@@ -32,51 +32,51 @@ up:
 	@echo "Flower (Celery Monitor): http://localhost:5555"
 
 down:
-	docker-compose down
+	docker compose down
 
 logs:
-	docker-compose logs -f
+	docker compose logs -f
 
 logs-api:
-	docker-compose logs -f api
+	docker compose logs -f api
 
 logs-worker:
-	docker-compose logs -f worker
+	docker compose logs -f worker
 
 migrate:
-	docker-compose exec api alembic upgrade head
+	docker compose exec api alembic upgrade head
 
 makemigrations:
 	@read -p "Enter migration message: " msg; \
-	docker-compose exec api alembic revision --autogenerate -m "$$msg"
+	docker compose exec api alembic revision --autogenerate -m "$$msg"
 
 seed:
-	docker-compose exec api python -m app.seed
+	docker compose exec api python -m app.seed
 
 test:
-	docker-compose exec api pytest
+	docker compose exec api pytest
 
 test-cov:
-	docker-compose exec api pytest --cov=app --cov-report=html --cov-report=term
+	docker compose exec api pytest --cov=app --cov-report=html --cov-report=term
 
 lint:
-	docker-compose exec api ruff check app/
+	docker compose exec api ruff check app/
 
 format:
-	docker-compose exec api black app/
-	docker-compose exec api ruff check --fix app/
+	docker compose exec api black app/
+	docker compose exec api ruff check --fix app/
 
 clean:
-	docker-compose down -v
+	docker compose down -v
 	rm -rf backend/__pycache__
 	rm -rf backend/app/__pycache__
 	rm -rf minio-data
 
 shell:
-	docker-compose exec api bash
+	docker compose exec api bash
 
 psql:
-	docker-compose exec postgres psql -U redpen -d redpen_db
+	docker compose exec postgres psql -U redpen -d redpen_db
 
 restart:
-	docker-compose restart api worker
+	docker compose restart api worker
