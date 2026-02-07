@@ -67,13 +67,3 @@ app.include_router(review.router, prefix="/api/review", tags=["Review"])
 app.include_router(gdpr.router, prefix="/api/gdpr", tags=["GDPR"])
 app.include_router(ml_datasets.router, prefix="/api/ml", tags=["ML Datasets"])
 
-
-@app.get("/", tags=["Root"])
-async def root():
-    """Root endpoint."""
-    return {
-        "name": settings.app_name,
-        "version": settings.app_version,
-        "docs": "/docs",
-        "health": "/health",
-    }
