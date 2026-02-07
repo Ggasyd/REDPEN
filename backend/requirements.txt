@@ -26,13 +26,13 @@ minio==7.2.3
 boto3==1.34.34
 
 # AI/ML Libraries
-openai==1.10.0
-google-generativeai==0.3.2
-mistralai==0.1.8
-Pillow==10.2.0
-pytesseract==0.3.10
-opencv-python-headless==4.9.0.80
-numpy==1.26.3
+openai>=1.10.0
+google-generativeai>=0.3.2
+mistralai>=0.1.8
+Pillow>=10.2.0
+pytesseract>=0.3.10
+opencv-python-headless>=4.9.0
+numpy>=1.26.3
 
 # PDF Processing
 PyPDF2==3.0.1
