@@ -77,7 +77,7 @@ NEVER grade or correct, only classify!"""
             )
 
             # Parse response (simplified for MVP)
-            content = response.choices[0].message.content
+            # content = response.choices[0].message.content
 
             # Stub: Return mock classifications
             return [
