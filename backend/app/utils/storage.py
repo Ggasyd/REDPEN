@@ -152,7 +152,5 @@ class StorageService:
             raise Exception(f"Failed to generate presigned URL: {e}")
 
 
-from datetime import timedelta
-
 # Global storage instance
 storage = StorageService()
