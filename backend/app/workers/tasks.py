@@ -160,7 +160,7 @@ async def retention_enforcement_daily_async():
 
     async with get_async_db() as db:
         # Get all active workspaces
-        result = await db.execute(select(Workspace).where(Workspace.is_active == True))
+        result = await db.execute(select(Workspace).where(Workspace.is_active))
         workspaces = result.scalars().all()
 
         for workspace in workspaces:
