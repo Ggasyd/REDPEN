@@ -293,7 +293,7 @@ async def flag_for_review_if_needed(submission: Submission, db: AsyncSession):
         select(AnswerBlock)
         .join(SubmissionPage)
         .where(SubmissionPage.submission_id == submission.id)
-        .where(AnswerBlock.needs_review == True)
+        .where(AnswerBlock.needs_review)
     )
     blocks_needing_review = result.scalars().all()
 
