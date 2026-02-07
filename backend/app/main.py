@@ -55,7 +55,7 @@ async def root():
     }
 
 
-# Import and include routers
+# Import and include routers  # noqa: E402
 from app.api import auth, workspaces, classrooms, exams, submissions, review, gdpr, ml_datasets
 
 app.include_router(auth.router, prefix="/api/auth", tags=["Authentication"])
