@@ -149,7 +149,7 @@ class AnswerBlock(BaseModel):
     is_manually_edited = Column(Boolean, default=False, nullable=False)
 
     # Metadata
-    metadata = Column(JSONB, nullable=True)  # Additional data from AI
+    metadata_json = Column(JSONB, nullable=True)  # Additional data from AI
 
     # Relationships
     page = relationship("SubmissionPage", back_populates="answer_blocks")
