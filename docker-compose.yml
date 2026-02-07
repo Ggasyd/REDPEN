@@ -1,0 +1,133 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:16-alpine
+    container_name: redpen_postgres
+    environment:
+      POSTGRES_USER: redpen
+      POSTGRES_PASSWORD: redpen_password
+      POSTGRES_DB: redpen_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U redpen"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Redis Cache & Message Broker
+  redis:
+    image: redis:7-alpine
+    container_name: redpen_redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # MinIO Object Storage
+  minio:
+    image: minio/minio:latest
+    container_name: redpen_minio
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: redpen_minio
+      MINIO_ROOT_PASSWORD: redpen_minio_secret_key_123
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio_data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+
+  # FastAPI Backend
+  api:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: redpen_api
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    env_file:
+      - ./backend/.env
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./backend:/app
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Celery Worker
+  worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: redpen_worker
+    command: celery -A app.workers.celery_app worker --loglevel=info
+    env_file:
+      - ./backend/.env
+    volumes:
+      - ./backend:/app
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+
+  # Celery Beat (Scheduler)
+  beat:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: redpen_beat
+    command: celery -A app.workers.celery_app beat --loglevel=info
+    env_file:
+      - ./backend/.env
+    volumes:
+      - ./backend:/app
+    depends_on:
+      - redis
+      - worker
+
+  # Flower (Celery Monitoring)
+  flower:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: redpen_flower
+    command: celery -A app.workers.celery_app flower --port=5555
+    env_file:
+      - ./backend/.env
+    ports:
+      - "5555:5555"
+    depends_on:
+      - redis
+      - worker
+
+volumes:
+  postgres_data:
+  redis_data:
+  minio_data:
