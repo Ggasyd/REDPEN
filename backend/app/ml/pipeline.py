@@ -80,9 +80,9 @@ async def process_page(page: SubmissionPage, submission: Submission, db: AsyncSe
     # Download page image
     try:
         page_bytes = storage.download_file(page.storage_url)
-    except:
+    except Exception as e:
         # If download fails, skip (development mode without MinIO)
-        print(f"Warning: Could not download page {page.id}")
+        print(f"Warning: Could not download page {page.id}: {e}")
         return
 
     # Get exam questions
