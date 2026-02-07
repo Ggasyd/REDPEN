@@ -44,6 +44,17 @@ async def health_check():
     return HealthResponse(status="healthy", version=settings.app_version)
 
 
+@app.get("/", tags=["Root"])
+async def root():
+    """Root endpoint."""
+    return {
+        "name": settings.app_name,
+        "version": settings.app_version,
+        "docs": "/docs",
+        "health": "/health",
+    }
+
+
 # Import and include routers
 from app.api import auth, workspaces, classrooms, exams, submissions, review, gdpr, ml_datasets
 
