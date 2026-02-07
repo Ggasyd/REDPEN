@@ -1,26 +1,28 @@
 """Seed database with demo data."""
 
 import asyncio
+
 from sqlalchemy import select
+
+from app.config import settings
 from app.database import AsyncSessionLocal
 from app.models import (
+    Classroom,
+    Exam,
+    ExamVersion,
+    Question,
+    Student,
     User,
     Workspace,
     WorkspaceMember,
     WorkspaceSettings,
-    Classroom,
-    Student,
-    Exam,
-    ExamVersion,
-    Question,
 )
 from app.models.enums import (
-    WorkspaceType,
-    WorkspaceRole,
     QuestionType,
+    WorkspaceRole,
+    WorkspaceType,
 )
 from app.utils.security import hash_password
-from app.config import settings
 
 
 async def seed_database():

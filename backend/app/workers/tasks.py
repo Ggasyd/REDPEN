@@ -1,8 +1,9 @@
 """Celery tasks for async processing."""
 
 import asyncio
-from uuid import UUID
 from datetime import datetime, timedelta
+from uuid import UUID
+
 from app.workers import celery_app
 
 
@@ -40,9 +41,10 @@ def process_submission_task(self, submission_id: str):
 async def process_submission_async(submission_id: str):
     """Async processing logic for submission."""
     from sqlalchemy import select
+
+    from app.ml.pipeline import process_submission_pipeline
     from app.models import Submission
     from app.models.enums import SubmissionStatus
-    from app.ml.pipeline import process_submission_pipeline
 
     async with get_async_db() as db:
         # Get submission
@@ -85,7 +87,8 @@ def retention_enforcement_task(run_id: str):
 async def retention_enforcement_async(run_id: str):
     """Async retention enforcement logic."""
     from sqlalchemy import select
-    from app.models import DataRetentionRun, WorkspaceSettings, Submission
+
+    from app.models import DataRetentionRun, Submission, WorkspaceSettings
     from app.models.enums import RetentionMode
 
     async with get_async_db() as db:
@@ -167,7 +170,8 @@ def retention_enforcement_daily():
 async def retention_enforcement_daily_async():
     """Run retention enforcement for all workspaces."""
     from sqlalchemy import select
-    from app.models import Workspace, DataRetentionRun
+
+    from app.models import DataRetentionRun, Workspace
     from app.models.enums import RetentionMode
 
     async with get_async_db() as db:

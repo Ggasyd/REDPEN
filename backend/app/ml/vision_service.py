@@ -1,9 +1,10 @@
 """Vision service using GPT-4o-mini and Gemini 1.5 Flash for semantic analysis."""
 
 import base64
-from typing import List, Dict
-from openai import AsyncOpenAI
+
 import google.generativeai as genai
+from openai import AsyncOpenAI
+
 from app.config import settings
 
 
@@ -20,8 +21,8 @@ class VisionService:
         self.gemini_model = genai.GenerativeModel(settings.gemini_model)
 
     async def classify_answer_blocks(
-        self, image_bytes: bytes, questions: List[Dict], use_gemini: bool = False
-    ) -> List[Dict]:
+        self, image_bytes: bytes, questions: list[dict], use_gemini: bool = False
+    ) -> list[dict]:
         """Classify answer blocks by question using semantic analysis.
 
         Args:
@@ -38,8 +39,8 @@ class VisionService:
             return await self._classify_with_gpt(image_bytes, questions)
 
     async def _classify_with_gpt(
-        self, image_bytes: bytes, questions: List[Dict]
-    ) -> List[Dict]:
+        self, image_bytes: bytes, questions: list[dict]
+    ) -> list[dict]:
         """Classify using GPT-4o-mini (vision)."""
         # Encode image
         image_base64 = base64.b64encode(image_bytes).decode("utf-8")
@@ -97,8 +98,8 @@ NEVER grade or correct, only classify!"""
             return await self._classify_with_gemini(image_bytes, questions)
 
     async def _classify_with_gemini(
-        self, image_bytes: bytes, questions: List[Dict]
-    ) -> List[Dict]:
+        self, image_bytes: bytes, questions: list[dict]
+    ) -> list[dict]:
         """Classify using Gemini 1.5 Flash (fallback)."""
         # Stub: Similar to GPT but with Gemini API
         # For MVP, return mock data
@@ -111,8 +112,8 @@ NEVER grade or correct, only classify!"""
         ]
 
     async def suggest_student_name(
-        self, image_bytes: bytes, student_list: List[str]
-    ) -> Dict:
+        self, image_bytes: bytes, student_list: list[str]
+    ) -> dict:
         """Suggest student name using vision + student list.
 
         Returns:

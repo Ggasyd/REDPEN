@@ -1,8 +1,9 @@
 """OCR service using Mistral OCR (Pixtral)."""
 
 import base64
-from typing import List, Dict, Optional
+
 import httpx
+
 from app.config import settings
 
 
@@ -18,7 +19,7 @@ class OCRService:
         self,
         image_bytes: bytes,
         prompt: str = "Extract all text from this image verbatim.",
-    ) -> Dict:
+    ) -> dict:
         """Extract text from image using Mistral OCR.
 
         Returns:
@@ -63,7 +64,7 @@ class OCRService:
             "blocks": [],  # Would need layout analysis
         }
 
-    async def extract_layout(self, image_bytes: bytes) -> List[Dict]:
+    async def extract_layout(self, image_bytes: bytes) -> list[dict]:
         """Extract layout and text blocks (horizontal slices for geometric pillar).
 
         Returns:
@@ -71,7 +72,7 @@ class OCRService:
         """
         # Stub: In production, use Mistral OCR with layout analysis prompt
         # For now, return mock layout
-        prompt = """Analyze the layout of this exam page. 
+        prompt = """Analyze the layout of this exam page.
         Identify all text blocks with their positions (top, middle, bottom).
         Return each block with: position, text content."""
 
@@ -87,8 +88,8 @@ class OCRService:
         ]
 
     async def extract_student_name(
-        self, image_bytes: bytes, name_zone_bbox: Optional[Dict] = None
-    ) -> Dict:
+        self, image_bytes: bytes, name_zone_bbox: dict | None = None
+    ) -> dict:
         """Extract student name from designated zone.
 
         Returns:

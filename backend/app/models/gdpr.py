@@ -1,11 +1,13 @@
 """GDPR and data retention models."""
 
-from sqlalchemy import Column, ForeignKey, Integer, Boolean, DateTime, Enum as SQLEnum
-from sqlalchemy.dialects.postgresql import UUID
-from app.models.base import JSONType
-from sqlalchemy.orm import relationship
 import uuid
-from app.models.base import BaseModel
+
+from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Integer
+from sqlalchemy import Enum as SQLEnum
+from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.orm import relationship
+
+from app.models.base import BaseModel, JSONType
 from app.models.enums import RetentionMode
 
 

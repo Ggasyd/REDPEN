@@ -1,14 +1,16 @@
 """Submissions routes - simplified for MVP."""
 
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
 from uuid import UUID
+
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from pydantic import BaseModel
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from app.database import get_db
-from app.models import Submission, ExamVersion, Exam, WorkspaceMember
-from app.models.enums import SubmissionStatus
 from app.dependencies import get_workspace_id, require_teacher
+from app.models import Exam, ExamVersion, Submission, WorkspaceMember
+from app.models.enums import SubmissionStatus
 from app.utils.storage import storage
 from app.workers.tasks import process_submission_task
 

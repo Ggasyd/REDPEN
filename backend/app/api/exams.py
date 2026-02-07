@@ -1,15 +1,16 @@
 """Exams routes - simplified for MVP."""
 
-from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
-from typing import List
 from uuid import UUID
+
+from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from app.database import get_db
+from app.dependencies import get_workspace_id, require_teacher
 from app.models import Exam, ExamVersion, Question, WorkspaceMember
 from app.models.enums import QuestionType
-from app.dependencies import get_workspace_id, require_teacher
 
 router = APIRouter()
 
@@ -111,7 +112,7 @@ async def create_exam_version(
 @router.post("/versions/{version_id}/questions", status_code=status.HTTP_201_CREATED)
 async def create_questions_bulk(
     version_id: UUID,
-    questions: List[QuestionCreate],
+    questions: list[QuestionCreate],
     workspace_id: UUID = Depends(get_workspace_id),
     membership: WorkspaceMember = Depends(require_teacher),
     db: AsyncSession = Depends(get_db),

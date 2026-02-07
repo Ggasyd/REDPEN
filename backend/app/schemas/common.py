@@ -1,7 +1,7 @@
 """Common schemas."""
 
+
 from pydantic import BaseModel
-from typing import Optional
 
 
 class HealthResponse(BaseModel):
@@ -21,4 +21,4 @@ class ErrorResponse(BaseModel):
     """Error response schema."""
 
     detail: str
-    error_code: Optional[str] = None
+    error_code: str | None = None

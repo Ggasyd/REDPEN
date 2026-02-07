@@ -1,7 +1,7 @@
 """Application configuration using Pydantic Settings."""
 
 import json
-from typing import List
+
 from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -59,7 +59,7 @@ class Settings(BaseSettings):
     mistral_ocr_model: str = "pixtral-12b-2409"
 
     # CORS
-    cors_origins: str | List[str] = '["http://localhost:3000","http://localhost:8000"]'
+    cors_origins: str | list[str] = '["http://localhost:3000","http://localhost:8000"]'
 
     # GDPR Defaults
     default_retention_submissions_days: int = 730
@@ -68,7 +68,7 @@ class Settings(BaseSettings):
 
     @field_validator("cors_origins", mode="before")
     @classmethod
-    def parse_cors_origins(cls, v: str) -> List[str]:
+    def parse_cors_origins(cls, v: str) -> list[str]:
         """Parse CORS origins from JSON string."""
         if isinstance(v, str):
             return json.loads(v)

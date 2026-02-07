@@ -1,8 +1,10 @@
 """FastAPI application main entry point."""
 
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from contextlib import asynccontextmanager
+
 from app.config import settings
 from app.schemas.common import HealthResponse
 
@@ -59,13 +61,13 @@ async def root():
 # Import and include routers
 from app.api import (
     auth,
-    workspaces,
     classrooms,
     exams,
-    submissions,
-    review,
     gdpr,
     ml_datasets,
+    review,
+    submissions,
+    workspaces,
 )  # noqa: E402
 
 app.include_router(auth.router, prefix="/api/auth", tags=["Authentication"])

@@ -1,26 +1,27 @@
 """Authentication routes."""
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from app.database import get_db
+from app.dependencies import get_current_user
 from app.models import User, Workspace, WorkspaceMember
-from app.models.enums import WorkspaceType, WorkspaceRole
+from app.models.enums import WorkspaceRole, WorkspaceType
 from app.schemas.auth import (
-    UserRegister,
-    UserLogin,
-    TokenResponse,
     RefreshTokenRequest,
+    TokenResponse,
+    UserLogin,
+    UserRegister,
     UserResponse,
 )
 from app.utils.security import (
-    hash_password,
-    verify_password,
     create_access_token,
     create_refresh_token,
     decode_token,
+    hash_password,
+    verify_password,
 )
-from app.dependencies import get_current_user
 
 router = APIRouter()
 

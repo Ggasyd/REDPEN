@@ -1,20 +1,23 @@
 """Exam and related models."""
 
+import uuid
+
 from sqlalchemy import (
+    Boolean,
     Column,
-    String,
+    Float,
     ForeignKey,
     Integer,
+    String,
     Text,
-    Float,
+)
+from sqlalchemy import (
     Enum as SQLEnum,
-    Boolean,
 )
 from sqlalchemy.dialects.postgresql import UUID
-from app.models.base import JSONType
 from sqlalchemy.orm import relationship
-import uuid
-from app.models.base import BaseModel
+
+from app.models.base import BaseModel, JSONType
 from app.models.enums import QuestionType
 
 

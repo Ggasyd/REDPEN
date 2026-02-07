@@ -1,9 +1,11 @@
 """Base model with common fields."""
 
 from datetime import datetime
-from sqlalchemy import Column, DateTime, JSON
+
+from sqlalchemy import JSON, Column, DateTime
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.ext.declarative import declared_attr
+
 from app.database import Base
 
 # JSON type that works with both PostgreSQL and SQLite

@@ -1,14 +1,14 @@
 """Fuzzy matching utilities for student name matching."""
 
-from typing import List, Optional, Tuple
+
 from fuzzywuzzy import fuzz, process
 
 
 def fuzzy_match_student(
     candidate_name: str,
-    student_names: List[Tuple[str, str]],  # [(student_id, full_name)]
+    student_names: list[tuple[str, str]],  # [(student_id, full_name)]
     threshold: int = 80,
-) -> Optional[Tuple[str, str, int]]:
+) -> tuple[str, str, int] | None:
     """Fuzzy match a candidate name against a list of student names.
 
     Args:

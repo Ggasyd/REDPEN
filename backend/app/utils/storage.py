@@ -2,11 +2,13 @@
 
 import io
 import os
-from typing import Optional, BinaryIO
-from uuid import uuid4
 from datetime import timedelta
+from typing import BinaryIO
+from uuid import uuid4
+
 from minio import Minio
 from minio.error import S3Error
+
 from app.config import settings
 
 
@@ -54,7 +56,7 @@ class StorageService:
     def upload_file(
         self,
         file_data: BinaryIO,
-        object_name: Optional[str] = None,
+        object_name: str | None = None,
         content_type: str = "application/octet-stream",
         folder: str = "uploads",
     ) -> str:
@@ -94,7 +96,7 @@ class StorageService:
     def upload_bytes(
         self,
         data: bytes,
-        object_name: Optional[str] = None,
+        object_name: str | None = None,
         content_type: str = "application/octet-stream",
         folder: str = "uploads",
     ) -> str:

@@ -1,11 +1,13 @@
 """Machine Learning and Human-in-the-Loop models."""
 
-from sqlalchemy import Column, String, ForeignKey, Text, Float, Boolean, Enum as SQLEnum
-from sqlalchemy.dialects.postgresql import UUID
-from app.models.base import JSONType
-from sqlalchemy.orm import relationship
 import uuid
-from app.models.base import BaseModel
+
+from sqlalchemy import Boolean, Column, Float, ForeignKey, String, Text
+from sqlalchemy import Enum as SQLEnum
+from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.orm import relationship
+
+from app.models.base import BaseModel, JSONType
 from app.models.enums import ActionEventType
 
 

@@ -1,20 +1,21 @@
 """Review routes - for correcting submissions."""
 
-from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
-from typing import List
 from uuid import UUID
+
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from app.database import get_db
+from app.dependencies import get_workspace_id, require_teacher
 from app.models import (
-    Submission,
     AnswerBlock,
     GradeDecision,
-    WorkspaceMember,
+    Submission,
     SubmissionPage,
+    WorkspaceMember,
 )
-from app.dependencies import get_workspace_id, require_teacher
 
 router = APIRouter()
 
@@ -43,7 +44,7 @@ class GradeDecisionUpdate(BaseModel):
 
 @router.get(
     "/submissions/{submission_id}/answer_blocks",
-    response_model=List[AnswerBlockResponse],
+    response_model=list[AnswerBlockResponse],
 )
 async def get_answer_blocks(
     submission_id: UUID,
@@ -165,6 +166,7 @@ async def finalize_submission(
         raise HTTPException(status_code=404, detail="Submission not found")
 
     from datetime import datetime
+
     from app.models.enums import SubmissionStatus
 
     submission.is_finalized = True

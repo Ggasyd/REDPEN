@@ -1,41 +1,41 @@
 """Models package - imports all models for Alembic autogeneration."""
 
 from app.models.base import Base, BaseModel, TimestampMixin
+from app.models.classroom import Classroom
 from app.models.enums import (
-    WorkspaceType,
-    WorkspaceRole,
-    QuestionType,
-    SubmissionStatus,
-    BlockType,
-    AssignMethod,
-    StudentAssignMethod,
-    ArtifactType,
     ActionEventType,
+    ArtifactType,
+    AssignMethod,
+    BlockType,
+    QuestionType,
     RetentionMode,
+    StudentAssignMethod,
+    SubmissionStatus,
+    WorkspaceRole,
+    WorkspaceType,
+)
+from app.models.exam import Exam, ExamVersion, Question, RubricCriterion, RubricDocument
+from app.models.gdpr import DataRetentionRun, WorkspaceSettings
+from app.models.ml_learning import (
+    AnswerBlockLabel,
+    CalibrationRecord,
+    HumanActionEvent,
+    PreferenceSample,
+    StudentAssignmentLabel,
+)
+from app.models.student import Student
+from app.models.submission import (
+    AnnotatedArtifact,
+    AnswerBlock,
+    FeedbackComment,
+    GradeDecision,
+    MCQMark,
+    StudentAssignment,
+    Submission,
+    SubmissionPage,
 )
 from app.models.user import User
 from app.models.workspace import Workspace, WorkspaceMember
-from app.models.classroom import Classroom
-from app.models.student import Student
-from app.models.exam import Exam, ExamVersion, RubricDocument, Question, RubricCriterion
-from app.models.submission import (
-    Submission,
-    SubmissionPage,
-    AnswerBlock,
-    StudentAssignment,
-    MCQMark,
-    GradeDecision,
-    FeedbackComment,
-    AnnotatedArtifact,
-)
-from app.models.ml_learning import (
-    AnswerBlockLabel,
-    StudentAssignmentLabel,
-    PreferenceSample,
-    CalibrationRecord,
-    HumanActionEvent,
-)
-from app.models.gdpr import WorkspaceSettings, DataRetentionRun
 
 __all__ = [
     # Base

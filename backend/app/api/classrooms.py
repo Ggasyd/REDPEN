@@ -1,14 +1,15 @@
 """Classrooms routes."""
 
-from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
-from typing import List
 from uuid import UUID
+
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
 from pydantic import BaseModel
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from app.database import get_db
-from app.models import Classroom, Student, WorkspaceMember
 from app.dependencies import get_workspace_id, require_teacher
+from app.models import Classroom, Student, WorkspaceMember
 
 router = APIRouter()
 
@@ -142,7 +143,7 @@ async def import_students(
     }
 
 
-@router.get("/{classroom_id}/students", response_model=List[StudentResponse])
+@router.get("/{classroom_id}/students", response_model=list[StudentResponse])
 async def list_students(
     classroom_id: UUID,
     workspace_id: UUID = Depends(get_workspace_id),

@@ -1,11 +1,12 @@
 """FastAPI dependencies for authentication and multi-tenancy."""
 
-from typing import Optional
 from uuid import UUID
-from fastapi import Depends, HTTPException, Header, status
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from sqlalchemy.ext.asyncio import AsyncSession
+
+from fastapi import Depends, Header, HTTPException, status
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from app.database import get_db
 from app.models import User, WorkspaceMember, WorkspaceRole
 from app.utils.security import decode_token
@@ -49,7 +50,7 @@ async def get_current_user(
 
 
 async def get_workspace_id(
-    x_workspace_id: Optional[str] = Header(None, alias="X-Workspace-Id"),
+    x_workspace_id: str | None = Header(None, alias="X-Workspace-Id"),
 ) -> UUID:
     """Extract workspace ID from header."""
     if not x_workspace_id:

@@ -1,11 +1,14 @@
 """Workspace and WorkspaceMember models."""
 
-from sqlalchemy import Column, String, Boolean, ForeignKey, Enum as SQLEnum
+import uuid
+
+from sqlalchemy import Boolean, Column, ForeignKey, String
+from sqlalchemy import Enum as SQLEnum
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
-import uuid
+
 from app.models.base import BaseModel
-from app.models.enums import WorkspaceType, WorkspaceRole
+from app.models.enums import WorkspaceRole, WorkspaceType
 
 
 class Workspace(BaseModel):

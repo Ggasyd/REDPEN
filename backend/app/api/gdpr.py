@@ -1,15 +1,17 @@
 """GDPR and retention routes."""
 
-from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
-from uuid import UUID
-from pydantic import BaseModel
 from datetime import datetime
+from uuid import UUID
+
+from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from app.database import get_db
-from app.models import WorkspaceSettings, DataRetentionRun, WorkspaceMember, Student
+from app.dependencies import get_workspace_id, require_admin, require_owner
+from app.models import DataRetentionRun, Student, WorkspaceMember, WorkspaceSettings
 from app.models.enums import RetentionMode
-from app.dependencies import get_workspace_id, require_owner, require_admin
 
 router = APIRouter()
 

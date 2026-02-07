@@ -3,14 +3,14 @@
 import enum
 
 
-class WorkspaceType(str, enum.Enum):
+class WorkspaceType(enum.StrEnum):
     """Workspace types."""
 
     PERSONAL = "PERSONAL"
     SCHOOL = "SCHOOL"
 
 
-class WorkspaceRole(str, enum.Enum):
+class WorkspaceRole(enum.StrEnum):
     """Workspace member roles."""
 
     OWNER = "OWNER"
@@ -19,7 +19,7 @@ class WorkspaceRole(str, enum.Enum):
     VIEWER = "VIEWER"
 
 
-class QuestionType(str, enum.Enum):
+class QuestionType(enum.StrEnum):
     """Question types."""
 
     OPEN = "OPEN"
@@ -28,7 +28,7 @@ class QuestionType(str, enum.Enum):
     MIXED = "MIXED"
 
 
-class SubmissionStatus(str, enum.Enum):
+class SubmissionStatus(enum.StrEnum):
     """Submission processing status."""
 
     UPLOADED = "UPLOADED"
@@ -40,7 +40,7 @@ class SubmissionStatus(str, enum.Enum):
     ERROR = "ERROR"
 
 
-class BlockType(str, enum.Enum):
+class BlockType(enum.StrEnum):
     """Answer block types."""
 
     TEXT = "TEXT"
@@ -50,7 +50,7 @@ class BlockType(str, enum.Enum):
     MIXED = "MIXED"
 
 
-class AssignMethod(str, enum.Enum):
+class AssignMethod(enum.StrEnum):
     """Answer block assignment method."""
 
     GEOMETRIC = "GEOMETRIC"
@@ -59,7 +59,7 @@ class AssignMethod(str, enum.Enum):
     MANUAL = "MANUAL"
 
 
-class StudentAssignMethod(str, enum.Enum):
+class StudentAssignMethod(enum.StrEnum):
     """Student assignment method."""
 
     EXPLICIT = "EXPLICIT"
@@ -68,7 +68,7 @@ class StudentAssignMethod(str, enum.Enum):
     MANUAL = "MANUAL"
 
 
-class ArtifactType(str, enum.Enum):
+class ArtifactType(enum.StrEnum):
     """Artifact types."""
 
     SUBJECT_PDF = "SUBJECT_PDF"
@@ -79,7 +79,7 @@ class ArtifactType(str, enum.Enum):
     ANNOTATED_PDF = "ANNOTATED_PDF"
 
 
-class ActionEventType(str, enum.Enum):
+class ActionEventType(enum.StrEnum):
     """Human action event types for ML learning."""
 
     TRANSCRIPTION_CORRECTED = "TRANSCRIPTION_CORRECTED"
@@ -91,7 +91,7 @@ class ActionEventType(str, enum.Enum):
     BLOCK_APPROVED = "BLOCK_APPROVED"
 
 
-class RetentionMode(str, enum.Enum):
+class RetentionMode(enum.StrEnum):
     """GDPR retention run modes."""
 
     PREVIEW = "PREVIEW"

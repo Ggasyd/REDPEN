@@ -1,30 +1,31 @@
 """Complete submission processing pipeline (3 pillars)."""
 
-from typing import List, Dict
 from uuid import UUID
-from sqlalchemy.ext.asyncio import AsyncSession
+
 from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.ml.detection_service import detection_service
+from app.ml.ocr_service import ocr_service
+from app.ml.vision_service import vision_service
 from app.models import (
-    Submission,
-    SubmissionPage,
     AnswerBlock,
+    ExamVersion,
+    GradeDecision,
     Question,
     Student,
     StudentAssignment,
-    GradeDecision,
-    ExamVersion,
+    Submission,
+    SubmissionPage,
 )
 from app.models.enums import (
-    BlockType,
     AssignMethod,
+    BlockType,
     StudentAssignMethod,
     SubmissionStatus,
 )
-from app.utils.storage import storage
 from app.utils.fuzzy_matching import fuzzy_match_student
-from app.ml.ocr_service import ocr_service
-from app.ml.vision_service import vision_service
-from app.ml.detection_service import detection_service
+from app.utils.storage import storage
 
 
 async def process_submission_pipeline(submission: Submission, db: AsyncSession):
@@ -59,7 +60,7 @@ async def process_submission_pipeline(submission: Submission, db: AsyncSession):
 
 async def split_pdf_to_pages(
     submission: Submission, db: AsyncSession
-) -> List[SubmissionPage]:
+) -> list[SubmissionPage]:
     """Split PDF into individual pages.
 
     Stub: In production, use PyPDF2 and pdf2image.
@@ -135,8 +136,8 @@ async def process_page(page: SubmissionPage, submission: Submission, db: AsyncSe
 
 
 async def extract_geometric_blocks(
-    page_bytes: bytes, questions: List[Question]
-) -> List[Dict]:
+    page_bytes: bytes, questions: list[Question]
+) -> list[dict]:
     """Pillar 1: Geometric extraction using OCR layout analysis."""
     try:
         layout = await ocr_service.extract_layout(page_bytes)
@@ -165,8 +166,8 @@ async def extract_geometric_blocks(
 
 
 async def extract_semantic_blocks(
-    page_bytes: bytes, questions: List[Question]
-) -> List[Dict]:
+    page_bytes: bytes, questions: list[Question]
+) -> list[dict]:
     """Pillar 2: Semantic extraction using vision models."""
     try:
         questions_data = [
@@ -203,8 +204,8 @@ async def extract_semantic_blocks(
 
 
 async def extract_detection_blocks(
-    page_bytes: bytes, questions: List[Question]
-) -> List[Dict]:
+    page_bytes: bytes, questions: list[Question]
+) -> list[dict]:
     """Pillar 3: Detection-based extraction for MCQ/tables."""
     # Filter MCQ questions
     from app.models.enums import QuestionType

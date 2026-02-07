@@ -1,8 +1,10 @@
 """Workspace schemas."""
 
-from pydantic import BaseModel, Field
 from datetime import datetime
-from app.models.enums import WorkspaceType, WorkspaceRole
+
+from pydantic import BaseModel, Field
+
+from app.models.enums import WorkspaceRole, WorkspaceType
 
 
 class WorkspaceCreate(BaseModel):

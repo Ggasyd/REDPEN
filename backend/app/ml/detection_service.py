@@ -1,16 +1,16 @@
 """Detection service for MCQ and tables (deterministic, pixel-based)."""
 
+
 import cv2
 import numpy as np
-from typing import List, Dict
 
 
 class DetectionService:
     """Deterministic detection for MCQ marks and tables."""
 
     def detect_mcq_marks(
-        self, image_bytes: bytes, options: List[str] = ["A", "B", "C", "D"]
-    ) -> Dict:
+        self, image_bytes: bytes, options: list[str] = None
+    ) -> dict:
         """Detect marked answer in MCQ using pixel density analysis.
 
         Args:
@@ -21,6 +21,8 @@ class DetectionService:
             {"detected_answer": str, "confidence": float}
         """
         # Convert bytes to numpy array
+        if options is None:
+            options = ["A", "B", "C", "D"]
         nparr = np.frombuffer(image_bytes, np.uint8)
         img = cv2.imdecode(nparr, cv2.IMREAD_GRAYSCALE)
 
@@ -59,7 +61,7 @@ class DetectionService:
             "confidence": float(confidence),
         }
 
-    def detect_table_cells(self, image_bytes: bytes) -> List[Dict]:
+    def detect_table_cells(self, image_bytes: bytes) -> list[dict]:
         """Detect table cells and extract content.
 
         Returns:
@@ -69,7 +71,7 @@ class DetectionService:
         # For MVP, return empty (requires proper table detection)
         return []
 
-    def detect_checkboxes(self, image_bytes: bytes) -> List[Dict]:
+    def detect_checkboxes(self, image_bytes: bytes) -> list[dict]:
         """Detect checkboxes and their states (checked/unchecked).
 
         Returns:
