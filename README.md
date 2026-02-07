@@ -328,7 +328,7 @@ make psql          # Shell PostgreSQL
 # - Activer HTTPS
 # - Configurer secrets
 
-docker-compose -f docker-compose.prod.yml up -d
+docker compose -f docker-compose.prod.yml up -d
 ```
 
 ### Kubernetes (optionnel)
