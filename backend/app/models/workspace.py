@@ -4,7 +4,7 @@ import uuid
 
 from sqlalchemy import Boolean, Column, ForeignKey, String
 from sqlalchemy import Enum as SQLEnum
-from sqlalchemy.dialects.postgresql import UUID
+from app.models.base import GUID as UUID
 from sqlalchemy.orm import relationship
 
 from app.models.base import BaseModel
@@ -16,7 +16,7 @@ class Workspace(BaseModel):
 
     __tablename__ = "workspaces"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id = Column(UUID, primary_key=True, default=uuid.uuid4)
     name = Column(String(255), nullable=False)
     workspace_type = Column(
         SQLEnum(WorkspaceType, name="workspace_type"),
@@ -48,7 +48,7 @@ class WorkspaceMember(BaseModel):
 
     __tablename__ = "workspace_members"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id = Column(UUID, primary_key=True, default=uuid.uuid4)
     workspace_id = Column(
         UUID(as_uuid=True),
         ForeignKey("workspaces.id", ondelete="CASCADE"),

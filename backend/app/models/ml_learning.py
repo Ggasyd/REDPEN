@@ -4,7 +4,7 @@ import uuid
 
 from sqlalchemy import Boolean, Column, Float, ForeignKey, String, Text
 from sqlalchemy import Enum as SQLEnum
-from sqlalchemy.dialects.postgresql import UUID
+from app.models.base import GUID as UUID
 from sqlalchemy.orm import relationship
 
 from app.models.base import BaseModel, JSONType
@@ -16,7 +16,7 @@ class AnswerBlockLabel(BaseModel):
 
     __tablename__ = "answer_block_labels"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id = Column(UUID, primary_key=True, default=uuid.uuid4)
     answer_block_id = Column(
         UUID(as_uuid=True),
         ForeignKey("answer_blocks.id", ondelete="CASCADE"),
@@ -32,11 +32,11 @@ class AnswerBlockLabel(BaseModel):
 
     # Original AI output
     original_transcription = Column(Text, nullable=True)
-    original_question_id = Column(UUID(as_uuid=True), nullable=True)
+    original_question_id = Column(UUID, nullable=True)
 
     # Corrected by human
     corrected_transcription = Column(Text, nullable=True)
-    corrected_question_id = Column(UUID(as_uuid=True), nullable=True)
+    corrected_question_id = Column(UUID, nullable=True)
 
     # Context
     correction_notes = Column(Text, nullable=True)
@@ -51,7 +51,7 @@ class StudentAssignmentLabel(BaseModel):
 
     __tablename__ = "student_assignment_labels"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id = Column(UUID, primary_key=True, default=uuid.uuid4)
     assignment_id = Column(
         UUID(as_uuid=True),
         ForeignKey("student_assignments.id", ondelete="CASCADE"),
@@ -70,7 +70,7 @@ class StudentAssignmentLabel(BaseModel):
     ai_candidate = Column(String(500), nullable=True)
 
     # Human decision
-    assigned_student_id = Column(UUID(as_uuid=True), nullable=False)
+    assigned_student_id = Column(UUID, nullable=False)
     correction_notes = Column(Text, nullable=True)
 
     # Relationships
@@ -83,7 +83,7 @@ class PreferenceSample(BaseModel):
 
     __tablename__ = "preference_samples"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id = Column(UUID, primary_key=True, default=uuid.uuid4)
     workspace_id = Column(
         UUID(as_uuid=True),
         ForeignKey("workspaces.id", ondelete="CASCADE"),
@@ -117,7 +117,7 @@ class CalibrationRecord(BaseModel):
 
     __tablename__ = "calibration_records"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id = Column(UUID, primary_key=True, default=uuid.uuid4)
     workspace_id = Column(
         UUID(as_uuid=True),
         ForeignKey("workspaces.id", ondelete="CASCADE"),
@@ -148,7 +148,7 @@ class HumanActionEvent(BaseModel):
 
     __tablename__ = "human_action_events"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id = Column(UUID, primary_key=True, default=uuid.uuid4)
     workspace_id = Column(
         UUID(as_uuid=True),
         ForeignKey("workspaces.id", ondelete="CASCADE"),
@@ -168,7 +168,7 @@ class HumanActionEvent(BaseModel):
         nullable=False,
     )
     entity_type = Column(String(100), nullable=False)  # submission, answer_block, etc.
-    entity_id = Column(UUID(as_uuid=True), nullable=False)
+    entity_id = Column(UUID, nullable=False)
 
     # Before/After
     before_value = Column(JSONType, nullable=True)

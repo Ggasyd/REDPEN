@@ -14,7 +14,7 @@ from sqlalchemy import (
 from sqlalchemy import (
     Enum as SQLEnum,
 )
-from sqlalchemy.dialects.postgresql import UUID
+from app.models.base import GUID as UUID
 from sqlalchemy.orm import relationship
 
 from app.models.base import BaseModel, JSONType
@@ -26,7 +26,7 @@ class Exam(BaseModel):
 
     __tablename__ = "exams"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id = Column(UUID, primary_key=True, default=uuid.uuid4)
     workspace_id = Column(
         UUID(as_uuid=True),
         ForeignKey("workspaces.id", ondelete="CASCADE"),
@@ -51,7 +51,7 @@ class ExamVersion(BaseModel):
 
     __tablename__ = "exam_versions"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id = Column(UUID, primary_key=True, default=uuid.uuid4)
     exam_id = Column(
         UUID(as_uuid=True),
         ForeignKey("exams.id", ondelete="CASCADE"),
@@ -83,7 +83,7 @@ class RubricDocument(BaseModel):
 
     __tablename__ = "rubric_documents"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id = Column(UUID, primary_key=True, default=uuid.uuid4)
     exam_version_id = Column(
         UUID(as_uuid=True),
         ForeignKey("exam_versions.id", ondelete="CASCADE"),
@@ -104,7 +104,7 @@ class Question(BaseModel):
 
     __tablename__ = "questions"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id = Column(UUID, primary_key=True, default=uuid.uuid4)
     exam_version_id = Column(
         UUID(as_uuid=True),
         ForeignKey("exam_versions.id", ondelete="CASCADE"),
@@ -140,7 +140,7 @@ class RubricCriterion(BaseModel):
 
     __tablename__ = "rubric_criteria"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id = Column(UUID, primary_key=True, default=uuid.uuid4)
     question_id = Column(
         UUID(as_uuid=True),
         ForeignKey("questions.id", ondelete="CASCADE"),

@@ -4,7 +4,7 @@ import uuid
 
 from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Integer
 from sqlalchemy import Enum as SQLEnum
-from sqlalchemy.dialects.postgresql import UUID
+from app.models.base import GUID as UUID
 from sqlalchemy.orm import relationship
 
 from app.models.base import BaseModel, JSONType
@@ -16,7 +16,7 @@ class WorkspaceSettings(BaseModel):
 
     __tablename__ = "workspace_settings"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id = Column(UUID, primary_key=True, default=uuid.uuid4)
     workspace_id = Column(
         UUID(as_uuid=True),
         ForeignKey("workspaces.id", ondelete="CASCADE"),
@@ -44,7 +44,7 @@ class DataRetentionRun(BaseModel):
 
     __tablename__ = "data_retention_runs"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id = Column(UUID, primary_key=True, default=uuid.uuid4)
     workspace_id = Column(
         UUID(as_uuid=True),
         ForeignKey("workspaces.id", ondelete="CASCADE"),

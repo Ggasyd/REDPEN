@@ -3,7 +3,7 @@
 import uuid
 
 from sqlalchemy import Boolean, Column, String
-from sqlalchemy.dialects.postgresql import UUID
+from app.models.base import GUID as UUID
 from sqlalchemy.orm import relationship
 
 from app.models.base import BaseModel
@@ -14,7 +14,7 @@ class User(BaseModel):
 
     __tablename__ = "users"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id = Column(UUID, primary_key=True, default=uuid.uuid4)
     email = Column(String(255), unique=True, nullable=False, index=True)
     hashed_password = Column(String(255), nullable=False)
     full_name = Column(String(255), nullable=True)

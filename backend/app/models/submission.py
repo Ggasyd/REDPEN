@@ -15,7 +15,7 @@ from sqlalchemy import (
 from sqlalchemy import (
     Enum as SQLEnum,
 )
-from sqlalchemy.dialects.postgresql import UUID
+from app.models.base import GUID as UUID
 from sqlalchemy.orm import relationship
 
 from app.models.base import BaseModel, JSONType
@@ -32,7 +32,7 @@ class Submission(BaseModel):
 
     __tablename__ = "submissions"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id = Column(UUID, primary_key=True, default=uuid.uuid4)
     workspace_id = Column(
         UUID(as_uuid=True),
         ForeignKey("workspaces.id", ondelete="CASCADE"),
@@ -104,7 +104,7 @@ class SubmissionPage(BaseModel):
 
     __tablename__ = "submission_pages"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id = Column(UUID, primary_key=True, default=uuid.uuid4)
     submission_id = Column(
         UUID(as_uuid=True),
         ForeignKey("submissions.id", ondelete="CASCADE"),
@@ -128,7 +128,7 @@ class AnswerBlock(BaseModel):
 
     __tablename__ = "answer_blocks"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id = Column(UUID, primary_key=True, default=uuid.uuid4)
     page_id = Column(
         UUID(as_uuid=True),
         ForeignKey("submission_pages.id", ondelete="CASCADE"),
@@ -192,7 +192,7 @@ class StudentAssignment(BaseModel):
 
     __tablename__ = "student_assignments"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id = Column(UUID, primary_key=True, default=uuid.uuid4)
     submission_id = Column(
         UUID(as_uuid=True),
         ForeignKey("submissions.id", ondelete="CASCADE"),
@@ -230,7 +230,7 @@ class MCQMark(BaseModel):
 
     __tablename__ = "mcq_marks"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id = Column(UUID, primary_key=True, default=uuid.uuid4)
     answer_block_id = Column(
         UUID(as_uuid=True),
         ForeignKey("answer_blocks.id", ondelete="CASCADE"),
@@ -250,7 +250,7 @@ class GradeDecision(BaseModel):
 
     __tablename__ = "grade_decisions"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id = Column(UUID, primary_key=True, default=uuid.uuid4)
     submission_id = Column(
         UUID(as_uuid=True),
         ForeignKey("submissions.id", ondelete="CASCADE"),
@@ -287,7 +287,7 @@ class FeedbackComment(BaseModel):
 
     __tablename__ = "feedback_comments"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id = Column(UUID, primary_key=True, default=uuid.uuid4)
     grade_decision_id = Column(
         UUID(as_uuid=True),
         ForeignKey("grade_decisions.id", ondelete="CASCADE"),
@@ -312,7 +312,7 @@ class AnnotatedArtifact(BaseModel):
 
     __tablename__ = "annotated_artifacts"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id = Column(UUID, primary_key=True, default=uuid.uuid4)
     submission_id = Column(
         UUID(as_uuid=True),
         ForeignKey("submissions.id", ondelete="CASCADE"),
