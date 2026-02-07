@@ -6,7 +6,7 @@ from typing import List
 from uuid import UUID
 from pydantic import BaseModel
 from app.database import get_db
-from app.models import Submission, AnswerBlock, GradeDecision, WorkspaceMember
+from app.models import Submission, AnswerBlock, GradeDecision, WorkspaceMember, SubmissionPage
 from app.dependencies import get_workspace_id, require_teacher
 
 router = APIRouter()
