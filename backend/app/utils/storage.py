@@ -12,8 +12,16 @@ class StorageService:
     """Service for object storage (MinIO/S3)."""
 
     def __init__(self):
+        self._client = None
+        self.bucket_name = None
+
+    def _initialize(self):
+        """Lazy initialization of storage client."""
+        if self._client is not None:
+            return
+
         if settings.storage_type == "minio":
-            self.client = Minio(
+            self._client = Minio(
                 settings.minio_endpoint,
                 access_key=settings.minio_access_key,
                 secret_key=settings.minio_secret_key,
@@ -25,6 +33,13 @@ class StorageService:
             raise NotImplementedError("S3 storage not yet implemented")
 
         self._ensure_bucket()
+
+    @property
+    def client(self):
+        """Get MinIO client, initializing if needed."""
+        if self._client is None:
+            self._initialize()
+        return self._client
 
     def _ensure_bucket(self) -> None:
         """Ensure bucket exists, create if not."""
