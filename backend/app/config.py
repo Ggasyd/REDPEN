@@ -61,7 +61,7 @@ class Settings(BaseSettings):
     mistral_ocr_model: str = "pixtral-12b-2409"
 
     # CORS
-    cors_origins: str = '["http://localhost:3000","http://localhost:8000"]'
+    cors_origins: str | List[str] = '["http://localhost:3000","http://localhost:8000"]'
 
     # GDPR Defaults
     default_retention_submissions_days: int = 730
