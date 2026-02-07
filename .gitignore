@@ -83,3 +83,7 @@ dmypy.json
 # Artifacts
 artifacts/
 uploads/
+-e 
+# Environment files
+*.env
+*.env.*
