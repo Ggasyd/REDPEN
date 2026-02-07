@@ -297,7 +297,7 @@ class AnnotatedArtifact(BaseModel):
     )
     artifact_type = Column(String(50), nullable=False)
     storage_url = Column(String(1000), nullable=False)
-    metadata = Column(JSONB, nullable=True)
+    metadata_json = Column(JSONB, nullable=True)
 
     # Relationships
     submission = relationship("Submission", back_populates="artifacts")
