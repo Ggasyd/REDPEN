@@ -23,7 +23,7 @@ async def list_workspaces(
         select(Workspace)
         .join(WorkspaceMember)
         .where(WorkspaceMember.user_id == current_user.id)
-        .where(Workspace.is_active == True)
+        .where(Workspace.is_active)
     )
     workspaces = result.scalars().all()
 
