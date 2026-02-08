@@ -38,6 +38,9 @@ class ExamTemplate(BaseModel):
         back_populates="templates",
         foreign_keys=[exam_version_id],
     )
+    zones = relationship(
+        "TemplateZone", back_populates="template", cascade="all, delete-orphan"
+    )
     zones = relationship("TemplateZone", back_populates="template", cascade="all, delete-orphan")
 
 
