@@ -64,6 +64,9 @@ class Submission(BaseModel):
     original_filename = Column(String(500), nullable=False)
     storage_url = Column(String(1000), nullable=False)
     page_count = Column(Integer, nullable=True)
+    alignment_score = Column(Float, nullable=True)
+    alignment_method = Column(String(30), nullable=True)
+    alignment_rotation = Column(Integer, nullable=True)
 
     # GDPR
     is_anonymized = Column(Boolean, default=False, nullable=False)
@@ -141,6 +144,7 @@ class AnswerBlock(BaseModel):
         nullable=True,
         index=True,
     )
+    question_key = Column(String(50), nullable=True)
 
     # Block identification
     block_type = Column(
