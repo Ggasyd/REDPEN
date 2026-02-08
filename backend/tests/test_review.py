@@ -30,10 +30,12 @@ async def test_get_answer_blocks(
         is_active=True,
     )
     workspace = workspace_factory(name="Review Workspace")
+    db_session.add_all([user, workspace])
+    await db_session.flush()
     membership = membership_factory(
         user_id=user.id, workspace_id=workspace.id, role=WorkspaceRole.TEACHER
     )
-    db_session.add_all([user, workspace, membership])
+    db_session.add(membership)
     await db_session.flush()
 
     exam = Exam(workspace_id=workspace.id, title="Review Exam")
@@ -95,10 +97,12 @@ async def test_finalize_submission_updates_status(
         is_active=True,
     )
     workspace = workspace_factory(name="Finalize Workspace")
+    db_session.add_all([user, workspace])
+    await db_session.flush()
     membership = membership_factory(
         user_id=user.id, workspace_id=workspace.id, role=WorkspaceRole.TEACHER
     )
-    db_session.add_all([user, workspace, membership])
+    db_session.add(membership)
     await db_session.flush()
 
     exam = Exam(workspace_id=workspace.id, title="Finalize Exam")
@@ -140,10 +144,12 @@ async def test_update_grade_decision(
         is_active=True,
     )
     workspace = workspace_factory(name="Grade Workspace")
+    db_session.add_all([user, workspace])
+    await db_session.flush()
     membership = membership_factory(
         user_id=user.id, workspace_id=workspace.id, role=WorkspaceRole.TEACHER
     )
-    db_session.add_all([user, workspace, membership])
+    db_session.add(membership)
     await db_session.flush()
 
     exam = Exam(workspace_id=workspace.id, title="Grade Exam")

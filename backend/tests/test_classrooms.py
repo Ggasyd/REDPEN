@@ -22,10 +22,12 @@ async def test_create_classroom_requires_teacher_role(
         is_active=True,
     )
     workspace = workspace_factory(name="Viewer Workspace")
+    db_session.add_all([user, workspace])
+    await db_session.flush()
     membership = membership_factory(
         user_id=user.id, workspace_id=workspace.id, role=WorkspaceRole.VIEWER
     )
-    db_session.add_all([user, workspace, membership])
+    db_session.add(membership)
     await db_session.commit()
 
     response = await client.post(
@@ -52,6 +54,8 @@ async def test_list_students_in_classroom(
         is_active=True,
     )
     workspace = workspace_factory(name="School Workspace")
+    db_session.add_all([user, workspace])
+    await db_session.flush()
     membership = membership_factory(
         user_id=user.id, workspace_id=workspace.id, role=WorkspaceRole.TEACHER
     )

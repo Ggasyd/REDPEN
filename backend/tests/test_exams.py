@@ -22,10 +22,12 @@ async def test_create_exam_and_version(
         is_active=True,
     )
     workspace = workspace_factory(name="Exam Workspace")
+    db_session.add_all([user, workspace])
+    await db_session.flush()
     membership = membership_factory(
         user_id=user.id, workspace_id=workspace.id, role=WorkspaceRole.TEACHER
     )
-    db_session.add_all([user, workspace, membership])
+    db_session.add(membership)
     await db_session.commit()
 
     response = await client.post(
@@ -59,10 +61,12 @@ async def test_create_questions_bulk_requires_workspace_match(
     )
     workspace = workspace_factory(name="Question Workspace")
     other_workspace = workspace_factory(name="Other Workspace")
+    db_session.add_all([user, workspace, other_workspace])
+    await db_session.flush()
     membership = membership_factory(
         user_id=user.id, workspace_id=workspace.id, role=WorkspaceRole.TEACHER
     )
-    db_session.add_all([user, workspace, other_workspace, membership])
+    db_session.add(membership)
     await db_session.commit()
 
     exam = Exam(workspace_id=workspace.id, title="Quiz")

@@ -22,10 +22,12 @@ async def test_export_datasets_requires_admin(
         is_active=True,
     )
     workspace = workspace_factory(name="ML Workspace")
+    db_session.add_all([user, workspace])
+    await db_session.flush()
     membership = membership_factory(
         user_id=user.id, workspace_id=workspace.id, role=WorkspaceRole.ADMIN
     )
-    db_session.add_all([user, workspace, membership])
+    db_session.add(membership)
     await db_session.commit()
 
     response = await client.get(
@@ -51,10 +53,12 @@ async def test_calibration_metrics_empty(
         is_active=True,
     )
     workspace = workspace_factory(name="Metrics Workspace")
+    db_session.add_all([user, workspace])
+    await db_session.flush()
     membership = membership_factory(
         user_id=user.id, workspace_id=workspace.id, role=WorkspaceRole.ADMIN
     )
-    db_session.add_all([user, workspace, membership])
+    db_session.add(membership)
     await db_session.commit()
 
     response = await client.get(

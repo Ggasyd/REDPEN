@@ -22,11 +22,13 @@ async def test_get_retention_settings_requires_admin(
         is_active=True,
     )
     workspace = workspace_factory(name="GDPR Workspace")
+    db_session.add_all([user, workspace])
+    await db_session.flush()
     membership = membership_factory(
         user_id=user.id, workspace_id=workspace.id, role=WorkspaceRole.ADMIN
     )
     settings = WorkspaceSettings(workspace_id=workspace.id)
-    db_session.add_all([user, workspace, membership, settings])
+    db_session.add_all([membership, settings])
     await db_session.commit()
 
     response = await client.get(
@@ -53,11 +55,13 @@ async def test_update_retention_settings_owner_only(
         is_active=True,
     )
     workspace = workspace_factory(name="Owner Workspace")
+    db_session.add_all([user, workspace])
+    await db_session.flush()
     membership = membership_factory(
         user_id=user.id, workspace_id=workspace.id, role=WorkspaceRole.OWNER
     )
     settings = WorkspaceSettings(workspace_id=workspace.id)
-    db_session.add_all([user, workspace, membership, settings])
+    db_session.add_all([membership, settings])
     await db_session.commit()
 
     response = await client.patch(
@@ -85,10 +89,12 @@ async def test_run_retention_enforcement_triggers_task(
         is_active=True,
     )
     workspace = workspace_factory(name="Retention Workspace")
+    db_session.add_all([user, workspace])
+    await db_session.flush()
     membership = membership_factory(
         user_id=user.id, workspace_id=workspace.id, role=WorkspaceRole.OWNER
     )
-    db_session.add_all([user, workspace, membership])
+    db_session.add(membership)
     await db_session.commit()
 
     called = {"count": 0}
@@ -124,6 +130,8 @@ async def test_anonymize_student(
         is_active=True,
     )
     workspace = workspace_factory(name="Privacy Workspace")
+    db_session.add_all([user, workspace])
+    await db_session.flush()
     membership = membership_factory(
         user_id=user.id, workspace_id=workspace.id, role=WorkspaceRole.ADMIN
     )
@@ -135,7 +143,7 @@ async def test_anonymize_student(
         last_name="Doe",
         display_name="Jane Doe",
     )
-    db_session.add_all([user, workspace, membership, classroom, student])
+    db_session.add_all([membership, classroom, student])
     await db_session.commit()
 
     response = await client.post(

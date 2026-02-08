@@ -22,10 +22,12 @@ async def test_upload_submission_requires_exam_version(
         is_active=True,
     )
     workspace = workspace_factory(name="Upload Workspace")
+    db_session.add_all([user, workspace])
+    await db_session.flush()
     membership = membership_factory(
         user_id=user.id, workspace_id=workspace.id, role=WorkspaceRole.TEACHER
     )
-    db_session.add_all([user, workspace, membership])
+    db_session.add(membership)
     await db_session.commit()
 
     response = await client.post(
@@ -53,10 +55,12 @@ async def test_upload_submission_success(
         is_active=True,
     )
     workspace = workspace_factory(name="Submission Workspace")
+    db_session.add_all([user, workspace])
+    await db_session.flush()
     membership = membership_factory(
         user_id=user.id, workspace_id=workspace.id, role=WorkspaceRole.TEACHER
     )
-    db_session.add_all([user, workspace, membership])
+    db_session.add(membership)
     await db_session.flush()
 
     exam = Exam(workspace_id=workspace.id, title="Final")
@@ -101,10 +105,12 @@ async def test_get_submission_isolated_by_workspace(
     )
     workspace = workspace_factory(name="Main Workspace")
     other_workspace = workspace_factory(name="Other Workspace")
+    db_session.add_all([user, workspace, other_workspace])
+    await db_session.flush()
     membership = membership_factory(
         user_id=user.id, workspace_id=workspace.id, role=WorkspaceRole.TEACHER
     )
-    db_session.add_all([user, workspace, other_workspace, membership])
+    db_session.add(membership)
     await db_session.flush()
 
     exam = Exam(workspace_id=workspace.id, title="Assessment")
