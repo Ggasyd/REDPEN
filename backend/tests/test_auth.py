@@ -1,6 +1,6 @@
 """Tests for authentication endpoints."""
 import pytest
-from httpx import AsyncClient
+from tests.utils import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.models import User
 from app.utils.security import hash_password
