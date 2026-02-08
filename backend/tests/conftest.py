@@ -46,13 +46,8 @@ else:
     create_access_token = hash_password = None
 
 if SQLALCHEMY_AVAILABLE:
-    def _build_test_database_url() -> str:
-        database_url = os.getenv("DATABASE_URL", "sqlite+aiosqlite:///:memory:")
-        if database_url.startswith("postgresql://"):
-            return database_url.replace("postgresql://", "postgresql+asyncpg://")
-        return database_url
-
-    TEST_DATABASE_URL = _build_test_database_url()
+    # Test database URL (in-memory SQLite for fast tests)
+    TEST_DATABASE_URL = "sqlite+aiosqlite:///:memory:"
 
     # Create test engine
     test_engine = create_async_engine(

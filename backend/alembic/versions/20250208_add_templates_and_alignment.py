@@ -70,7 +70,9 @@ def upgrade() -> None:
         sa.Column("bbox_y", sa.Integer(), nullable=False),
         sa.Column("bbox_width", sa.Integer(), nullable=False),
         sa.Column("bbox_height", sa.Integer(), nullable=False),
-        sa.Column("pad_ratio", sa.Float(), nullable=False, server_default="0.10"),
+        sa.Column(
+            "pad_ratio", sa.Float(), nullable=False, server_default="0.10"
+        ),
         sa.Column("confidence", sa.Float(), nullable=True),
         sa.Column(
             "source", sa.String(length=20), nullable=False, server_default="vector"
@@ -104,12 +106,7 @@ def upgrade() -> None:
         sa.Column(
             "active_template_id",
             sa.Uuid(),
-            sa.ForeignKey(
-                "exam_templates.id",
-                ondelete="SET NULL",
-                use_alter=True,
-                name="fk_exam_versions_active_template",
-            ),
+            sa.ForeignKey("exam_templates.id", ondelete="SET NULL"),
             nullable=True,
         ),
     )
@@ -119,12 +116,9 @@ def upgrade() -> None:
         ["active_template_id"],
     )
 
+    op.add_column("submissions", sa.Column("alignment_score", sa.Float(), nullable=True))
     op.add_column(
-        "submissions", sa.Column("alignment_score", sa.Float(), nullable=True)
-    )
-    op.add_column(
-        "submissions",
-        sa.Column("alignment_method", sa.String(length=30), nullable=True),
+        "submissions", sa.Column("alignment_method", sa.String(length=30), nullable=True)
     )
     op.add_column(
         "submissions",

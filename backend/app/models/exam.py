@@ -63,24 +63,13 @@ class ExamVersion(BaseModel):
     notes = Column(Text, nullable=True)
     active_template_id = Column(
         UUID(as_uuid=True),
-        ForeignKey(
-            "exam_templates.id",
-            ondelete="SET NULL",
-            use_alter=True,
-            name="fk_exam_versions_active_template",
-        ),
+        ForeignKey("exam_templates.id", ondelete="SET NULL"),
         nullable=True,
     )
 
     # Relationships
     exam = relationship("Exam", back_populates="versions")
     active_template = relationship("ExamTemplate", foreign_keys=[active_template_id])
-    templates = relationship(
-        "ExamTemplate",
-        back_populates="exam_version",
-        foreign_keys="ExamTemplate.exam_version_id",
-        cascade="all, delete-orphan",
-    )
     rubric_document = relationship(
         "RubricDocument",
         back_populates="exam_version",
