@@ -91,7 +91,31 @@ jobs:
         env:
           DATABASE_URL: postgresql://redpen_test:test_password@localhost:5432/redpen_test_db
           REDIS_URL: redis://localhost:6379/0
-          SECRET_KEY: test-secret-key-for-ci-cd-pipeline-testing
+          SECRET_KEY: test-secret-key-for-ci-cd-pipeline-testing-minimum-32-characters-long
+          # Storage (MinIO for tests)
+          STORAGE_TYPE: minio
+          MINIO_ENDPOINT: localhost:9000
+          MINIO_ACCESS_KEY: test_minio_access
+          MINIO_SECRET_KEY: test_minio_secret_key_123
+          MINIO_SECURE: "False"
+          MINIO_BUCKET_NAME: test-bucket
+          # AI Service Keys (dummy values for CI/CD)
+          OPENAI_API_KEY: sk-test-dummy-key-for-ci-cd-testing-only-not-real
+          GOOGLE_API_KEY: AIzaTest-Dummy-Google-API-Key-For-CI-CD-Testing
+          MISTRAL_API_KEY: test-dummy-mistral-key-for-ci-cd-pipeline
+          # AI Model Configuration
+          OPENAI_MODEL: gpt-4o-mini
+          GEMINI_MODEL: gemini-1.5-flash
+          MISTRAL_OCR_MODEL: pixtral-12b-2409
+          # Celery (for tests)
+          CELERY_BROKER_URL: redis://localhost:6379/0
+          CELERY_RESULT_BACKEND: redis://localhost:6379/0
+          # CORS
+          CORS_ORIGINS: '["http://localhost:3000","http://localhost:8000"]'
+          # GDPR Defaults
+          DEFAULT_RETENTION_SUBMISSIONS_DAYS: "730"
+          DEFAULT_RETENTION_ARTIFACTS_DAYS: "365"
+          DEFAULT_RETENTION_ML_DAYS: "365"
         run: |
           cd backend
           pytest --cov=app --cov-report=xml --cov-report=term -v
