@@ -38,18 +38,14 @@ class ExamTemplate(BaseModel):
         back_populates="templates",
         foreign_keys=[exam_version_id],
     )
-    zones = relationship(
-        "TemplateZone", back_populates="template", cascade="all, delete-orphan"
-    )
+    zones = relationship("TemplateZone", back_populates="template", cascade="all, delete-orphan")
 
 
 class TemplateZone(BaseModel):
     """Template zone mapping to a question."""
 
     __tablename__ = "template_zones"
-    __table_args__ = (
-        Index("ix_template_zones_question_key", "question_key"),
-    )
+    __table_args__ = (Index("ix_template_zones_question_key", "question_key"),)
 
     id = Column(UUID, primary_key=True, default=uuid.uuid4)
     template_id = Column(
