@@ -26,7 +26,7 @@ class ExamTemplate(BaseModel):
     dpi = Column(Integer, nullable=False, default=250)
     metadata_json = Column(JSONType, nullable=True)
 
-    exam_version = relationship("ExamVersion", foreign_keys=[exam_version_id])
+    exam_version = relationship("ExamVersion")
     zones = relationship(
         "TemplateZone", back_populates="template", cascade="all, delete-orphan"
     )
