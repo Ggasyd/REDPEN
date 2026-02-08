@@ -136,6 +136,8 @@ async def test_anonymize_student(
         user_id=user.id, workspace_id=workspace.id, role=WorkspaceRole.ADMIN
     )
     classroom = Classroom(workspace_id=workspace.id, name="Privacy Class")
+    db_session.add(classroom)
+    await db_session.flush()
     student = Student(
         workspace_id=workspace.id,
         classroom_id=classroom.id,
@@ -143,7 +145,7 @@ async def test_anonymize_student(
         last_name="Doe",
         display_name="Jane Doe",
     )
-    db_session.add_all([membership, classroom, student])
+    db_session.add_all([membership, student])
     await db_session.commit()
 
     response = await client.post(

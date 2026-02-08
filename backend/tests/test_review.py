@@ -166,7 +166,11 @@ async def test_update_grade_decision(
     )
     db_session.add(submission)
     await db_session.flush()
-    decision = GradeDecision(submission_id=submission.id, final_score=0)
+    decision = GradeDecision(
+        submission_id=submission.id,
+        total_score=100,
+        final_score=0,
+    )
     db_session.add(decision)
     await db_session.commit()
 

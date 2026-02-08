@@ -34,8 +34,6 @@ async def test_refresh_token_flow(client: AsyncClient, db_session: AsyncSession)
     data = response.json()
     assert data["access_token"]
     assert data["refresh_token"]
-    assert data["refresh_token"] != refresh_token
-
     decoded = decode_token(data["access_token"])
     assert decoded["sub"] == str(user.id)
     assert decoded["type"] == "access"

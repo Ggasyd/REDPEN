@@ -60,6 +60,8 @@ async def test_list_students_in_classroom(
         user_id=user.id, workspace_id=workspace.id, role=WorkspaceRole.TEACHER
     )
     classroom = Classroom(workspace_id=workspace.id, name="Math")
+    db_session.add(classroom)
+    await db_session.flush()
     student = Student(
         workspace_id=workspace.id,
         classroom_id=classroom.id,
@@ -67,7 +69,7 @@ async def test_list_students_in_classroom(
         last_name="Student",
         display_name="Sam Student",
     )
-    db_session.add_all([user, workspace, membership, classroom, student])
+    db_session.add_all([membership, student])
     await db_session.commit()
 
     response = await client.get(

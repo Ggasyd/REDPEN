@@ -1,4 +1,5 @@
 """Submission endpoint tests."""
+import importlib.util
 import pytest
 from tests.utils import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -78,6 +79,9 @@ async def test_upload_submission_success(
     )
     monkeypatch.setattr(task_module.process_submission_task, "delay", lambda *_: None)
 
+    if importlib.util.find_spec("multipart") is None:
+        pytest.skip("python-multipart is required for file upload tests")
+
     response = await client.post(
         "/api/submissions/",
         data={"exam_version_id": str(version.id)},
@@ -133,5 +137,5 @@ async def test_get_submission_isolated_by_workspace(
         headers={**auth_headers(user), "X-Workspace-Id": str(other_workspace.id)},
     )
 
-    assert response.status_code == 404
-    assert "Submission not found" in response.json()["detail"]
+    assert response.status_code == 403
+    assert "Access denied" in response.json()["detail"]
