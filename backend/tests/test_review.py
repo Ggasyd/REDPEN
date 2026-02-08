@@ -169,6 +169,7 @@ async def test_update_grade_decision(
     decision = GradeDecision(
         submission_id=submission.id,
         total_score=100,
+        max_score=100,
         final_score=0,
     )
     db_session.add(decision)

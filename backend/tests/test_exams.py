@@ -90,5 +90,5 @@ async def test_create_questions_bulk_requires_workspace_match(
         headers={**auth_headers(user), "X-Workspace-Id": str(other_workspace.id)},
     )
 
-    assert response.status_code == 404
-    assert "Exam version not found" in response.json()["detail"]
+    assert response.status_code == 403
+    assert "Access denied" in response.json()["detail"]

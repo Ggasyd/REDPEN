@@ -84,7 +84,7 @@ async def test_upload_submission_success(
 
     response = await client.post(
         "/api/submissions/",
-        data={"exam_version_id": str(version.id)},
+        params={"exam_version_id": str(version.id)},
         files={"file": ("test.pdf", b"PDF", "application/pdf")},
         headers={**auth_headers(user), "X-Workspace-Id": str(workspace.id)},
     )
