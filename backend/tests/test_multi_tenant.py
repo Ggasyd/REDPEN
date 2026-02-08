@@ -1,6 +1,6 @@
 """Tests for multi-tenancy and workspace access."""
 import pytest
-from httpx import AsyncClient
+from tests.utils import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.models import User, Workspace, WorkspaceMember
 from app.models.enums import WorkspaceType, WorkspaceRole
