@@ -2,7 +2,7 @@
 
 import uuid
 
-from sqlalchemy import Column, Float, ForeignKey, Integer, String
+from sqlalchemy import Column, Float, ForeignKey, Index, Integer, String, UniqueConstraint
 from sqlalchemy.orm import relationship
 
 from app.models.base import GUID as UUID
@@ -13,6 +13,13 @@ class ExamTemplate(BaseModel):
     """Template PDF and derived metadata for an exam version."""
 
     __tablename__ = "exam_templates"
+    __table_args__ = (
+        UniqueConstraint(
+            "exam_version_id",
+            "template_hash",
+            name="uq_exam_templates_hash_per_version",
+        ),
+    )
 
     id = Column(UUID, primary_key=True, default=uuid.uuid4)
     exam_version_id = Column(
@@ -26,7 +33,11 @@ class ExamTemplate(BaseModel):
     dpi = Column(Integer, nullable=False, default=250)
     metadata_json = Column(JSONType, nullable=True)
 
-    exam_version = relationship("ExamVersion")
+    exam_version = relationship(
+        "ExamVersion",
+        back_populates="templates",
+        foreign_keys=[exam_version_id],
+    )
     zones = relationship(
         "TemplateZone", back_populates="template", cascade="all, delete-orphan"
     )
@@ -36,6 +47,9 @@ class TemplateZone(BaseModel):
     """Template zone mapping to a question."""
 
     __tablename__ = "template_zones"
+    __table_args__ = (
+        Index("ix_template_zones_question_key", "question_key"),
+    )
 
     id = Column(UUID, primary_key=True, default=uuid.uuid4)
     template_id = Column(

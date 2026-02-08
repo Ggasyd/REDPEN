@@ -70,6 +70,12 @@ class ExamVersion(BaseModel):
     # Relationships
     exam = relationship("Exam", back_populates="versions")
     active_template = relationship("ExamTemplate", foreign_keys=[active_template_id])
+    templates = relationship(
+        "ExamTemplate",
+        back_populates="exam_version",
+        foreign_keys="ExamTemplate.exam_version_id",
+        cascade="all, delete-orphan",
+    )
     rubric_document = relationship(
         "RubricDocument",
         back_populates="exam_version",
