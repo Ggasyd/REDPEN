@@ -64,7 +64,9 @@ def extract_template_zones_from_pdf(
                 bbox_x = max(0, min(page_width - 1, label_x1 + 12))
                 bbox_y = max(0, label_y0 - 4)
                 bbox_width = max(1, page_width - bbox_x - 20)
-                bbox_height = max(1, min(page_height - bbox_y, max(90, label_y1 - label_y0 + 80)))
+                bbox_height = max(
+                    1, min(page_height - bbox_y, max(90, label_y1 - label_y0 + 80))
+                )
 
                 zones.append(
                     {

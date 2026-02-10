@@ -166,7 +166,6 @@ def _zone_to_response(zone: TemplateZone) -> TemplateZoneResponse:
     )
 
 
-
 async def _create_zone_revision(
     db: AsyncSession,
     zone: TemplateZone,
@@ -482,7 +481,11 @@ async def extract_and_insert_template_zones(
         "zones_detected": len(inserted_zones),
         "page_count": page_count,
         "extractor": "pymupdf",
-        "extractor_version": (extracted_zones[0].get("extractor_version") if extracted_zones else "pymupdf_v2"),
+        "extractor_version": (
+            extracted_zones[0].get("extractor_version")
+            if extracted_zones
+            else "pymupdf_v2"
+        ),
     }
     await db.commit()
 
@@ -520,7 +523,6 @@ async def get_template_zones_preview(
     )
     zones = zones_result.scalars().all()
     return [_zone_to_response(zone) for zone in zones]
-
 
 
 async def _apply_template_zone_patch(
@@ -626,8 +628,6 @@ async def patch_template_zone(
     return _zone_to_response(zone)
 
 
-
-
 @router.post(
     "/templates/{template_id}/zones/validate",
     response_model=TemplateZonesValidateResponse,
@@ -661,7 +661,9 @@ async def validate_template_zones(
     now = datetime.now(UTC).replace(tzinfo=None)
     for zone in zones:
         is_bbox_valid = zone.bbox_width > 0 and zone.bbox_height > 0
-        is_page_valid = zone.page_index >= 0 and zone.page_index < max(1, template.page_count)
+        is_page_valid = zone.page_index >= 0 and zone.page_index < max(
+            1, template.page_count
+        )
         if not is_bbox_valid or not is_page_valid:
             invalid_zone_ids.append(str(zone.id))
             continue
@@ -781,7 +783,9 @@ async def bulk_patch_template_zones(
         )
         zone = zone_result.scalar_one_or_none()
         if not zone:
-            raise HTTPException(status_code=404, detail=f"Zone not found: {item.zone_id}")
+            raise HTTPException(
+                status_code=404, detail=f"Zone not found: {item.zone_id}"
+            )
 
         patch_payload = TemplateZonePatch(**item.model_dump(exclude={"zone_id"}))
         changes_applied = await _apply_template_zone_patch(
