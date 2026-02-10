@@ -1,6 +1,7 @@
 """Exams routes - simplified for MVP."""
 
 import hashlib
+from datetime import UTC, datetime
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
@@ -9,9 +10,19 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
-from app.dependencies import get_workspace_id, require_teacher
-from app.models import Exam, ExamTemplate, ExamVersion, Question, WorkspaceMember
+from app.dependencies import get_current_user, get_workspace_id, require_teacher
+from app.models import (
+    Exam,
+    ExamTemplate,
+    ExamVersion,
+    Question,
+    TemplateZone,
+    TemplateZoneRevision,
+    User,
+    WorkspaceMember,
+)
 from app.models.enums import QuestionType
+from app.services.template_extraction import extract_template_zones_from_pdf
 from app.utils.storage import storage
 
 router = APIRouter()
@@ -50,6 +61,103 @@ class TemplateUploadResponse(BaseModel):
     page_count: int
     dpi: int
     is_active: bool
+
+
+class TemplateZoneResponse(BaseModel):
+    id: str
+    template_id: str
+    page_index: int
+    question_key: str
+    bbox_x: int
+    bbox_y: int
+    bbox_width: int
+    bbox_height: int
+    pad_ratio: float
+    confidence: float | None
+    source: str
+    is_validated: bool
+    edit_source: str
+
+
+class TemplateZonePatch(BaseModel):
+    page_index: int | None = None
+    question_key: str | None = None
+    bbox_x: int | None = None
+    bbox_y: int | None = None
+    bbox_width: int | None = None
+    bbox_height: int | None = None
+    pad_ratio: float | None = None
+    confidence: float | None = None
+    source: str | None = None
+    is_validated: bool | None = None
+    change_reason: str | None = None
+    edit_source: str | None = None
+
+
+class TemplateZoneExtractResponse(BaseModel):
+    template_id: str
+    page_count: int
+    inserted_count: int
+    zones: list[TemplateZoneResponse]
+
+
+def _zone_to_response(zone: TemplateZone) -> TemplateZoneResponse:
+    return TemplateZoneResponse(
+        id=str(zone.id),
+        template_id=str(zone.template_id),
+        page_index=zone.page_index,
+        question_key=zone.question_key,
+        bbox_x=zone.bbox_x,
+        bbox_y=zone.bbox_y,
+        bbox_width=zone.bbox_width,
+        bbox_height=zone.bbox_height,
+        pad_ratio=zone.pad_ratio,
+        confidence=zone.confidence,
+        source=zone.source,
+        is_validated=zone.is_validated,
+        edit_source=zone.edit_source,
+    )
+
+
+async def _create_zone_revision(
+    db: AsyncSession,
+    zone: TemplateZone,
+    change_type: str,
+    changed_by: UUID | None,
+    change_reason: str | None = None,
+) -> None:
+    result = await db.execute(
+        select(TemplateZoneRevision)
+        .where(TemplateZoneRevision.zone_id == zone.id)
+        .order_by(TemplateZoneRevision.revision_number.desc())
+        .limit(1)
+    )
+    latest_revision = result.scalar_one_or_none()
+    next_revision_number = (
+        (latest_revision.revision_number + 1) if latest_revision else 1
+    )
+
+    revision = TemplateZoneRevision(
+        zone_id=zone.id,
+        template_id=zone.template_id,
+        revision_number=next_revision_number,
+        change_type=change_type,
+        change_reason=change_reason,
+        changed_by=changed_by,
+        changed_at=datetime.now(UTC).replace(tzinfo=None),
+        page_index=zone.page_index,
+        question_key=zone.question_key,
+        bbox_x=zone.bbox_x,
+        bbox_y=zone.bbox_y,
+        bbox_width=zone.bbox_width,
+        bbox_height=zone.bbox_height,
+        pad_ratio=zone.pad_ratio,
+        confidence=zone.confidence,
+        source=zone.source,
+        is_validated=zone.is_validated,
+        edit_source=zone.edit_source,
+    )
+    db.add(revision)
 
 
 @router.post("/", response_model=ExamResponse, status_code=status.HTTP_201_CREATED)
@@ -254,4 +362,218 @@ async def upload_exam_template(
         page_count=template.page_count,
         dpi=template.dpi,
         is_active=version.active_template_id == template.id,
+    )
+
+
+@router.post(
+    "/templates/{template_id}/zones/extract",
+    response_model=TemplateZoneExtractResponse,
+)
+async def extract_and_insert_template_zones(
+    template_id: UUID,
+    workspace_id: UUID = Depends(get_workspace_id),
+    membership: WorkspaceMember = Depends(require_teacher),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Extract candidate zones from template PDF and persist them."""
+    result = await db.execute(
+        select(ExamTemplate)
+        .join(ExamVersion, ExamTemplate.exam_version_id == ExamVersion.id)
+        .join(Exam, ExamVersion.exam_id == Exam.id)
+        .where(ExamTemplate.id == template_id)
+        .where(Exam.workspace_id == workspace_id)
+    )
+    template = result.scalar_one_or_none()
+    if not template:
+        raise HTTPException(status_code=404, detail="Template not found")
+
+    pdf_bytes = storage.download_file(template.storage_url)
+    page_count, extracted_zones = extract_template_zones_from_pdf(pdf_bytes)
+
+    existing_result = await db.execute(
+        select(TemplateZone).where(TemplateZone.template_id == template_id)
+    )
+    for zone in existing_result.scalars().all():
+        await db.delete(zone)
+
+    inserted_zones: list[TemplateZone] = []
+    now = datetime.now(UTC).replace(tzinfo=None)
+    for zone_data in extracted_zones:
+        zone = TemplateZone(
+            template_id=template_id,
+            page_index=zone_data["page_index"],
+            question_key=zone_data["question_key"],
+            bbox_x=zone_data["bbox_x"],
+            bbox_y=zone_data["bbox_y"],
+            bbox_width=zone_data["bbox_width"],
+            bbox_height=zone_data["bbox_height"],
+            pad_ratio=zone_data.get("pad_ratio", 0.10),
+            confidence=zone_data.get("confidence"),
+            source=zone_data.get("source", "auto_pymupdf"),
+            is_validated=False,
+            last_edited_at=now,
+            last_edited_by=current_user.id,
+            edit_source="auto",
+        )
+        db.add(zone)
+        await db.flush()
+        await _create_zone_revision(
+            db=db,
+            zone=zone,
+            change_type="extract_insert",
+            changed_by=current_user.id,
+            change_reason="automatic extraction",
+        )
+        inserted_zones.append(zone)
+
+    template.page_count = page_count
+    template.metadata_json = {
+        **(template.metadata_json or {}),
+        "status": "zones_extracted",
+    }
+    await db.commit()
+
+    return TemplateZoneExtractResponse(
+        template_id=str(template.id),
+        page_count=page_count,
+        inserted_count=len(inserted_zones),
+        zones=[_zone_to_response(zone) for zone in inserted_zones],
+    )
+
+
+@router.get("/templates/{template_id}/zones", response_model=list[TemplateZoneResponse])
+async def get_template_zones_preview(
+    template_id: UUID,
+    workspace_id: UUID = Depends(get_workspace_id),
+    membership: WorkspaceMember = Depends(require_teacher),
+    db: AsyncSession = Depends(get_db),
+):
+    """Preview zones for a template."""
+    template_result = await db.execute(
+        select(ExamTemplate)
+        .join(ExamVersion, ExamTemplate.exam_version_id == ExamVersion.id)
+        .join(Exam, ExamVersion.exam_id == Exam.id)
+        .where(ExamTemplate.id == template_id)
+        .where(Exam.workspace_id == workspace_id)
+    )
+    template = template_result.scalar_one_or_none()
+    if not template:
+        raise HTTPException(status_code=404, detail="Template not found")
+
+    zones_result = await db.execute(
+        select(TemplateZone)
+        .where(TemplateZone.template_id == template_id)
+        .order_by(TemplateZone.page_index, TemplateZone.question_key)
+    )
+    zones = zones_result.scalars().all()
+    return [_zone_to_response(zone) for zone in zones]
+
+
+@router.patch(
+    "/templates/{template_id}/zones/{zone_id}",
+    response_model=TemplateZoneResponse,
+)
+async def patch_template_zone(
+    template_id: UUID,
+    zone_id: UUID,
+    payload: TemplateZonePatch,
+    workspace_id: UUID = Depends(get_workspace_id),
+    membership: WorkspaceMember = Depends(require_teacher),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Adjust and/or validate a template zone."""
+    template_result = await db.execute(
+        select(ExamTemplate)
+        .join(ExamVersion, ExamTemplate.exam_version_id == ExamVersion.id)
+        .join(Exam, ExamVersion.exam_id == Exam.id)
+        .where(ExamTemplate.id == template_id)
+        .where(Exam.workspace_id == workspace_id)
+    )
+    template = template_result.scalar_one_or_none()
+    if not template:
+        raise HTTPException(status_code=404, detail="Template not found")
+
+    zone_result = await db.execute(
+        select(TemplateZone)
+        .where(TemplateZone.id == zone_id)
+        .where(TemplateZone.template_id == template_id)
+    )
+    zone = zone_result.scalar_one_or_none()
+    if not zone:
+        raise HTTPException(status_code=404, detail="Zone not found")
+
+    changes_applied = False
+
+    for field in [
+        "page_index",
+        "question_key",
+        "bbox_x",
+        "bbox_y",
+        "bbox_width",
+        "bbox_height",
+        "pad_ratio",
+        "confidence",
+        "source",
+    ]:
+        new_value = getattr(payload, field)
+        if new_value is not None and getattr(zone, field) != new_value:
+            setattr(zone, field, new_value)
+            changes_applied = True
+
+    now = datetime.now(UTC).replace(tzinfo=None)
+    if payload.is_validated is not None and payload.is_validated != zone.is_validated:
+        zone.is_validated = payload.is_validated
+        if payload.is_validated:
+            zone.validated_at = now
+            zone.validated_by = current_user.id
+        else:
+            zone.validated_at = None
+            zone.validated_by = None
+        changes_applied = True
+
+    if payload.edit_source is not None:
+        zone.edit_source = payload.edit_source
+    elif changes_applied:
+        zone.edit_source = "manual"
+
+    if changes_applied:
+        zone.last_edited_at = now
+        zone.last_edited_by = current_user.id
+        await db.flush()
+        await _create_zone_revision(
+            db=db,
+            zone=zone,
+            change_type="update",
+            changed_by=current_user.id,
+            change_reason=payload.change_reason,
+        )
+        await db.commit()
+
+    return _zone_to_response(zone)
+
+
+@router.put(
+    "/templates/{template_id}/zones/{zone_id}",
+    response_model=TemplateZoneResponse,
+)
+async def put_template_zone(
+    template_id: UUID,
+    zone_id: UUID,
+    payload: TemplateZonePatch,
+    workspace_id: UUID = Depends(get_workspace_id),
+    membership: WorkspaceMember = Depends(require_teacher),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """PUT alias for updating/validating a template zone."""
+    return await patch_template_zone(
+        template_id=template_id,
+        zone_id=zone_id,
+        payload=payload,
+        workspace_id=workspace_id,
+        membership=membership,
+        current_user=current_user,
+        db=db,
     )
