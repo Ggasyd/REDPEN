@@ -3,7 +3,9 @@
 import uuid
 
 from sqlalchemy import (
+    Boolean,
     Column,
+    DateTime,
     Float,
     ForeignKey,
     Index,
@@ -37,6 +39,10 @@ class ExamTemplate(BaseModel):
         index=True,
     )
     template_hash = Column(String(128), nullable=False)
+    original_filename = Column(String(500), nullable=False)
+    storage_url = Column(String(1000), nullable=False)
+    content_type = Column(String(100), nullable=False, default="application/pdf")
+    file_size = Column(Integer, nullable=False)
     page_count = Column(Integer, nullable=False)
     dpi = Column(Integer, nullable=False, default=250)
     metadata_json = Column(JSONType, nullable=True)
@@ -73,5 +79,19 @@ class TemplateZone(BaseModel):
     pad_ratio = Column(Float, nullable=False, default=0.10)
     confidence = Column(Float, nullable=True)
     source = Column(String(20), nullable=False, default="vector")
+    is_validated = Column(Boolean, nullable=False, default=False)
+    validated_at = Column(DateTime, nullable=True)
+    validated_by = Column(
+        UUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    last_edited_at = Column(DateTime, nullable=True)
+    last_edited_by = Column(
+        UUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    edit_source = Column(String(20), nullable=False, default="auto")
 
     template = relationship("ExamTemplate", back_populates="zones")
