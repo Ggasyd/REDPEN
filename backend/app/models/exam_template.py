@@ -3,7 +3,9 @@
 import uuid
 
 from sqlalchemy import (
+    Boolean,
     Column,
+    DateTime,
     Float,
     ForeignKey,
     Index,
@@ -77,5 +79,19 @@ class TemplateZone(BaseModel):
     pad_ratio = Column(Float, nullable=False, default=0.10)
     confidence = Column(Float, nullable=True)
     source = Column(String(20), nullable=False, default="vector")
+    is_validated = Column(Boolean, nullable=False, default=False)
+    validated_at = Column(DateTime, nullable=True)
+    validated_by = Column(
+        UUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    last_edited_at = Column(DateTime, nullable=True)
+    last_edited_by = Column(
+        UUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    edit_source = Column(String(20), nullable=False, default="auto")
 
     template = relationship("ExamTemplate", back_populates="zones")
