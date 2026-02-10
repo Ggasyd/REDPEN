@@ -1,7 +1,7 @@
 """Exams routes - simplified for MVP."""
 
-from datetime import UTC, datetime
 import hashlib
+from datetime import UTC, datetime
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
