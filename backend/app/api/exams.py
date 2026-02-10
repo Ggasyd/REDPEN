@@ -1,16 +1,18 @@
 """Exams routes - simplified for MVP."""
 
+import hashlib
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
 from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
 from app.dependencies import get_workspace_id, require_teacher
-from app.models import Exam, ExamVersion, Question, WorkspaceMember
+from app.models import Exam, ExamTemplate, ExamVersion, Question, WorkspaceMember
 from app.models.enums import QuestionType
+from app.utils.storage import storage
 
 router = APIRouter()
 
@@ -38,6 +40,16 @@ class QuestionCreate(BaseModel):
     question_type: QuestionType
     max_points: float
     order_index: int
+
+
+class TemplateUploadResponse(BaseModel):
+    template_id: str
+    exam_version_id: str
+    template_hash: str
+    original_filename: str
+    page_count: int
+    dpi: int
+    is_active: bool
 
 
 @router.post("/", response_model=ExamResponse, status_code=status.HTTP_201_CREATED)
@@ -149,3 +161,97 @@ async def create_questions_bulk(
         "message": f"Created {len(created_questions)} questions",
         "count": len(created_questions),
     }
+
+
+@router.post(
+    "/versions/{version_id}/templates",
+    response_model=TemplateUploadResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+async def upload_exam_template(
+    version_id: UUID,
+    file: UploadFile = File(...),
+    set_active: bool = True,
+    dpi: int = 250,
+    workspace_id: UUID = Depends(get_workspace_id),
+    membership: WorkspaceMember = Depends(require_teacher),
+    db: AsyncSession = Depends(get_db),
+):
+    """Upload a template PDF for an exam version."""
+    result = await db.execute(
+        select(ExamVersion)
+        .join(Exam)
+        .where(ExamVersion.id == version_id)
+        .where(Exam.workspace_id == workspace_id)
+    )
+    version = result.scalar_one_or_none()
+    if not version:
+        raise HTTPException(status_code=404, detail="Exam version not found")
+
+    if not file.filename or not file.filename.lower().endswith(".pdf"):
+        raise HTTPException(status_code=400, detail="Template file must be a PDF")
+
+    content_type = file.content_type or "application/pdf"
+    if content_type != "application/pdf":
+        raise HTTPException(
+            status_code=400,
+            detail="Template content type must be application/pdf",
+        )
+
+    if dpi < 72 or dpi > 600:
+        raise HTTPException(status_code=400, detail="dpi must be between 72 and 600")
+
+    file_content = await file.read()
+    if not file_content:
+        raise HTTPException(status_code=400, detail="Template file is empty")
+
+    template_hash = hashlib.sha256(file_content).hexdigest()
+
+    existing_result = await db.execute(
+        select(ExamTemplate).where(
+            ExamTemplate.exam_version_id == version_id,
+            ExamTemplate.template_hash == template_hash,
+        )
+    )
+    existing_template = existing_result.scalar_one_or_none()
+    if existing_template:
+        raise HTTPException(
+            status_code=409,
+            detail="Template already exists for this exam version",
+        )
+
+    storage_url = storage.upload_bytes(
+        file_content,
+        object_name=f"{version_id}/{template_hash}.pdf",
+        content_type=content_type,
+        folder="templates",
+    )
+
+    template = ExamTemplate(
+        exam_version_id=version_id,
+        template_hash=template_hash,
+        original_filename=file.filename,
+        storage_url=storage_url,
+        content_type=content_type,
+        file_size=len(file_content),
+        page_count=0,
+        dpi=dpi,
+        metadata_json={"status": "uploaded"},
+    )
+    db.add(template)
+    await db.flush()
+
+    if set_active:
+        version.active_template_id = template.id
+
+    await db.commit()
+
+    return TemplateUploadResponse(
+        template_id=str(template.id),
+        exam_version_id=str(version.id),
+        template_hash=template.template_hash,
+        original_filename=template.original_filename,
+        page_count=template.page_count,
+        dpi=template.dpi,
+        is_active=version.active_template_id == template.id,
+    )
