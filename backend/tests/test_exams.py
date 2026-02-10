@@ -1,9 +1,17 @@
 """Exam endpoint tests."""
 
 import pytest
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models import Exam, ExamTemplate, ExamVersion, User
+from app.models import (
+    Exam,
+    ExamTemplate,
+    ExamVersion,
+    TemplateZone,
+    TemplateZoneRevision,
+    User,
+)
 from app.models.enums import QuestionType, WorkspaceRole
 from app.utils.security import hash_password
 from tests.utils import AsyncClient
@@ -188,3 +196,197 @@ async def test_upload_exam_template_requires_pdf_content_type(
 
     assert response.status_code == 400
     assert "PDF" in response.json()["detail"]
+
+
+@pytest.mark.asyncio
+async def test_extract_and_preview_template_zones(
+    client: AsyncClient,
+    db_session: AsyncSession,
+    auth_headers,
+    workspace_factory,
+    membership_factory,
+    monkeypatch,
+):
+    user = User(
+        email="zones-teacher@example.com",
+        hashed_password=hash_password("password123"),
+        is_active=True,
+    )
+    workspace = workspace_factory(name="Zones Workspace")
+    db_session.add_all([user, workspace])
+    await db_session.flush()
+    membership = membership_factory(
+        user_id=user.id, workspace_id=workspace.id, role=WorkspaceRole.TEACHER
+    )
+    db_session.add(membership)
+    await db_session.flush()
+
+    exam = Exam(workspace_id=workspace.id, title="Zones Exam")
+    db_session.add(exam)
+    await db_session.flush()
+    version = ExamVersion(exam_id=exam.id, version_number=1, is_active=True)
+    db_session.add(version)
+    await db_session.flush()
+    template = ExamTemplate(
+        exam_version_id=version.id,
+        template_hash="abc123",
+        original_filename="template.pdf",
+        storage_url="bucket/templates/template.pdf",
+        content_type="application/pdf",
+        file_size=123,
+        page_count=0,
+        dpi=250,
+        metadata_json={"status": "uploaded"},
+    )
+    db_session.add(template)
+    await db_session.commit()
+
+    from app.api import exams as exams_api
+    from app.utils import storage as storage_module
+
+    monkeypatch.setattr(storage_module.storage, "download_file", lambda *args, **kwargs: b"%PDF")
+    monkeypatch.setattr(
+        exams_api,
+        "extract_template_zones_from_pdf",
+        lambda *_args, **_kwargs: (
+            2,
+            [
+                {
+                    "page_index": 0,
+                    "question_key": "Q1",
+                    "bbox_x": 10,
+                    "bbox_y": 20,
+                    "bbox_width": 300,
+                    "bbox_height": 120,
+                    "pad_ratio": 0.1,
+                    "confidence": 0.9,
+                    "source": "auto_pymupdf",
+                }
+            ],
+        ),
+    )
+
+    extract_response = await client.post(
+        f"/api/exams/templates/{template.id}/zones/extract",
+        headers={**auth_headers(user), "X-Workspace-Id": str(workspace.id)},
+    )
+    assert extract_response.status_code == 200
+    extract_payload = extract_response.json()
+    assert extract_payload["inserted_count"] == 1
+    assert extract_payload["page_count"] == 2
+    assert extract_payload["zones"][0]["question_key"] == "Q1"
+
+    preview_response = await client.get(
+        f"/api/exams/templates/{template.id}/zones",
+        headers={**auth_headers(user), "X-Workspace-Id": str(workspace.id)},
+    )
+    assert preview_response.status_code == 200
+    preview_payload = preview_response.json()
+    assert len(preview_payload) == 1
+    assert preview_payload[0]["question_key"] == "Q1"
+
+    zone_result = await db_session.execute(
+        select(TemplateZone).where(TemplateZone.template_id == template.id)
+    )
+    zone = zone_result.scalar_one_or_none()
+    assert zone is not None
+
+    revision_result = await db_session.execute(
+        select(TemplateZoneRevision).where(TemplateZoneRevision.zone_id == zone.id)
+    )
+    revision = revision_result.scalar_one_or_none()
+    assert revision is not None
+    assert revision.change_type == "extract_insert"
+
+
+@pytest.mark.asyncio
+async def test_patch_zone_updates_validation_and_creates_revision(
+    client: AsyncClient,
+    db_session: AsyncSession,
+    auth_headers,
+    workspace_factory,
+    membership_factory,
+):
+    user = User(
+        email="zones-update@example.com",
+        hashed_password=hash_password("password123"),
+        is_active=True,
+    )
+    workspace = workspace_factory(name="Zones Update Workspace")
+    db_session.add_all([user, workspace])
+    await db_session.flush()
+    membership = membership_factory(
+        user_id=user.id, workspace_id=workspace.id, role=WorkspaceRole.TEACHER
+    )
+    db_session.add(membership)
+    await db_session.flush()
+
+    exam = Exam(workspace_id=workspace.id, title="Zones Exam")
+    db_session.add(exam)
+    await db_session.flush()
+    version = ExamVersion(exam_id=exam.id, version_number=1, is_active=True)
+    db_session.add(version)
+    await db_session.flush()
+    template = ExamTemplate(
+        exam_version_id=version.id,
+        template_hash="abc124",
+        original_filename="template.pdf",
+        storage_url="bucket/templates/template2.pdf",
+        content_type="application/pdf",
+        file_size=321,
+        page_count=1,
+        dpi=250,
+        metadata_json={"status": "zones_extracted"},
+    )
+    db_session.add(template)
+    await db_session.flush()
+
+    zone = TemplateZone(
+        template_id=template.id,
+        page_index=0,
+        question_key="Q1",
+        bbox_x=10,
+        bbox_y=10,
+        bbox_width=100,
+        bbox_height=100,
+        pad_ratio=0.1,
+        confidence=0.8,
+        source="auto_pymupdf",
+        is_validated=False,
+        edit_source="auto",
+    )
+    db_session.add(zone)
+    await db_session.commit()
+
+    response = await client.patch(
+        f"/api/exams/templates/{template.id}/zones/{zone.id}",
+        json={
+            "bbox_x": 15,
+            "bbox_y": 25,
+            "is_validated": True,
+            "change_reason": "manual adjust",
+            "edit_source": "manual",
+        },
+        headers={**auth_headers(user), "X-Workspace-Id": str(workspace.id)},
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["bbox_x"] == 15
+    assert payload["bbox_y"] == 25
+    assert payload["is_validated"] is True
+    assert payload["edit_source"] == "manual"
+
+    zone_db = await db_session.get(TemplateZone, zone.id)
+    assert zone_db is not None
+    assert zone_db.validated_by == user.id
+    assert zone_db.validated_at is not None
+
+    revision_result = await db_session.execute(
+        select(TemplateZoneRevision)
+        .where(TemplateZoneRevision.zone_id == zone.id)
+        .order_by(TemplateZoneRevision.revision_number)
+    )
+    revisions = revision_result.scalars().all()
+    assert len(revisions) == 1
+    assert revisions[0].change_type == "update"
