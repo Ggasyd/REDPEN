@@ -1,11 +1,12 @@
 """Exam endpoint tests."""
+
 import pytest
-from tests.utils import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import Exam, ExamTemplate, ExamVersion, User
 from app.models.enums import QuestionType, WorkspaceRole
 from app.utils.security import hash_password
+from tests.utils import AsyncClient
 
 
 @pytest.mark.asyncio
