@@ -379,8 +379,8 @@ async def extract_and_insert_template_zones(
     """Extract candidate zones from template PDF and persist them."""
     result = await db.execute(
         select(ExamTemplate)
-        .join(ExamVersion)
-        .join(Exam)
+        .join(ExamVersion, ExamTemplate.exam_version_id == ExamVersion.id)
+        .join(Exam, ExamVersion.exam_id == Exam.id)
         .where(ExamTemplate.id == template_id)
         .where(Exam.workspace_id == workspace_id)
     )
@@ -452,8 +452,8 @@ async def get_template_zones_preview(
     """Preview zones for a template."""
     template_result = await db.execute(
         select(ExamTemplate)
-        .join(ExamVersion)
-        .join(Exam)
+        .join(ExamVersion, ExamTemplate.exam_version_id == ExamVersion.id)
+        .join(Exam, ExamVersion.exam_id == Exam.id)
         .where(ExamTemplate.id == template_id)
         .where(Exam.workspace_id == workspace_id)
     )
@@ -486,8 +486,8 @@ async def patch_template_zone(
     """Adjust and/or validate a template zone."""
     template_result = await db.execute(
         select(ExamTemplate)
-        .join(ExamVersion)
-        .join(Exam)
+        .join(ExamVersion, ExamTemplate.exam_version_id == ExamVersion.id)
+        .join(Exam, ExamVersion.exam_id == Exam.id)
         .where(ExamTemplate.id == template_id)
         .where(Exam.workspace_id == workspace_id)
     )
