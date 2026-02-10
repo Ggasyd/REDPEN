@@ -37,6 +37,10 @@ class ExamTemplate(BaseModel):
         index=True,
     )
     template_hash = Column(String(128), nullable=False)
+    original_filename = Column(String(500), nullable=False)
+    storage_url = Column(String(1000), nullable=False)
+    content_type = Column(String(100), nullable=False, default="application/pdf")
+    file_size = Column(Integer, nullable=False)
     page_count = Column(Integer, nullable=False)
     dpi = Column(Integer, nullable=False, default=250)
     metadata_json = Column(JSONType, nullable=True)
