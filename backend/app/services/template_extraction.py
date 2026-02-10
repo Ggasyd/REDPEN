@@ -2,6 +2,8 @@
 
 import re
 
+HEURISTIC_VERSION = "pymupdf_v2"
+
 QUESTION_PATTERN = re.compile(
     r"^\s*(?:question|q)?\s*([0-9]+[a-zA-Z]?)\b", re.IGNORECASE
 )
@@ -25,7 +27,17 @@ def extract_template_zones_from_pdf(
     with fitz.open(stream=pdf_bytes, filetype="pdf") as document:
         page_count = len(document)
         for page_index, page in enumerate(document):
-            for block in page.get_text("blocks"):
+            page_rect = page.rect
+            page_width = int(page_rect.width)
+            page_height = int(page_rect.height)
+            seen_question_keys: set[str] = set()
+
+            blocks = sorted(
+                page.get_text("blocks"),
+                key=lambda block: (float(block[1]), float(block[0])),
+            )
+
+            for block in blocks:
                 if len(block) < 5:
                     continue
 
@@ -39,15 +51,25 @@ def extract_template_zones_from_pdf(
                     continue
 
                 question_number = match.group(1)
-                bbox_x = max(0, int(x0))
-                bbox_y = max(0, int(y0))
-                bbox_width = max(1, int(x1 - x0))
-                bbox_height = max(1, int(y1 - y0))
+                question_key = f"Q{question_number}"
+                if question_key in seen_question_keys:
+                    continue
+
+                seen_question_keys.add(question_key)
+
+                label_x1 = int(x1)
+                label_y0 = int(y0)
+                label_y1 = int(y1)
+
+                bbox_x = max(0, min(page_width - 1, label_x1 + 12))
+                bbox_y = max(0, label_y0 - 4)
+                bbox_width = max(1, page_width - bbox_x - 20)
+                bbox_height = max(1, min(page_height - bbox_y, max(90, label_y1 - label_y0 + 80)))
 
                 zones.append(
                     {
                         "page_index": page_index,
-                        "question_key": f"Q{question_number}",
+                        "question_key": question_key,
                         "bbox_x": bbox_x,
                         "bbox_y": bbox_y,
                         "bbox_width": bbox_width,
@@ -55,6 +77,7 @@ def extract_template_zones_from_pdf(
                         "pad_ratio": pad_ratio,
                         "confidence": 0.75,
                         "source": "auto_pymupdf",
+                        "extractor_version": HEURISTIC_VERSION,
                     }
                 )
 
