@@ -133,7 +133,9 @@ async def _create_zone_revision(
         .limit(1)
     )
     latest_revision = result.scalar_one_or_none()
-    next_revision_number = (latest_revision.revision_number + 1) if latest_revision else 1
+    next_revision_number = (
+        (latest_revision.revision_number + 1) if latest_revision else 1
+    )
 
     revision = TemplateZoneRevision(
         zone_id=zone.id,
@@ -426,7 +428,10 @@ async def extract_and_insert_template_zones(
         inserted_zones.append(zone)
 
     template.page_count = page_count
-    template.metadata_json = {**(template.metadata_json or {}), "status": "zones_extracted"}
+    template.metadata_json = {
+        **(template.metadata_json or {}),
+        "status": "zones_extracted",
+    }
     await db.commit()
 
     return TemplateZoneExtractResponse(
