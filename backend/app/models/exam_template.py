@@ -95,3 +95,52 @@ class TemplateZone(BaseModel):
     edit_source = Column(String(20), nullable=False, default="auto")
 
     template = relationship("ExamTemplate", back_populates="zones")
+    revisions = relationship(
+        "TemplateZoneRevision", back_populates="zone", cascade="all, delete-orphan"
+    )
+
+
+class TemplateZoneRevision(BaseModel):
+    """Immutable revision log for template zone changes."""
+
+    __tablename__ = "template_zone_revisions"
+    __table_args__ = (
+        Index("ix_template_zone_revisions_zone_rev", "zone_id", "revision_number"),
+    )
+
+    id = Column(UUID, primary_key=True, default=uuid.uuid4)
+    zone_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("template_zones.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    template_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("exam_templates.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    revision_number = Column(Integer, nullable=False)
+    change_type = Column(String(30), nullable=False)
+    change_reason = Column(String(255), nullable=True)
+    changed_by = Column(
+        UUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    changed_at = Column(DateTime, nullable=False)
+
+    page_index = Column(Integer, nullable=False)
+    question_key = Column(String(50), nullable=False)
+    bbox_x = Column(Integer, nullable=False)
+    bbox_y = Column(Integer, nullable=False)
+    bbox_width = Column(Integer, nullable=False)
+    bbox_height = Column(Integer, nullable=False)
+    pad_ratio = Column(Float, nullable=False, default=0.10)
+    confidence = Column(Float, nullable=True)
+    source = Column(String(20), nullable=False)
+    is_validated = Column(Boolean, nullable=False, default=False)
+    edit_source = Column(String(20), nullable=False, default="auto")
+
+    zone = relationship("TemplateZone", back_populates="revisions")

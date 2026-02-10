@@ -15,7 +15,7 @@ from app.models.enums import (
     WorkspaceType,
 )
 from app.models.exam import Exam, ExamVersion, Question, RubricCriterion, RubricDocument
-from app.models.exam_template import ExamTemplate, TemplateZone
+from app.models.exam_template import ExamTemplate, TemplateZone, TemplateZoneRevision
 from app.models.gdpr import DataRetentionRun, WorkspaceSettings
 from app.models.ml_learning import (
     AnswerBlockLabel,
@@ -67,6 +67,7 @@ __all__ = [
     "RubricCriterion",
     "ExamTemplate",
     "TemplateZone",
+    "TemplateZoneRevision",
     "Submission",
     "SubmissionPage",
     "AnswerBlock",
