@@ -75,6 +75,7 @@ async def process_submission_pipeline(submission: Submission, db: AsyncSession):
                         "error": str(e),
                     }
                 )
+                print(f"Warning: Could not download template {template.id}: {e}")
 
     # Step 2-4: Process each page
     alignment_scores: list[float] = []
@@ -144,6 +145,7 @@ async def align_submission_page(
                 "error": str(e),
             }
         )
+        print(f"Warning: Could not download page {page.id} for alignment: {e}")
         submission.alignment_method = "none"
         submission.alignment_rotation = 0
         submission.alignment_score = 0.0
