@@ -390,3 +390,193 @@ async def test_patch_zone_updates_validation_and_creates_revision(
     revisions = revision_result.scalars().all()
     assert len(revisions) == 1
     assert revisions[0].change_type == "update"
+
+
+@pytest.mark.asyncio
+async def test_validate_template_zones_marks_valid_and_updates_metadata(
+    client: AsyncClient,
+    db_session: AsyncSession,
+    auth_headers,
+    workspace_factory,
+    membership_factory,
+):
+    user = User(
+        email="zones-validate@example.com",
+        hashed_password=hash_password("password123"),
+        is_active=True,
+    )
+    workspace = workspace_factory(name="Zones Validate Workspace")
+    db_session.add_all([user, workspace])
+    await db_session.flush()
+    membership = membership_factory(
+        user_id=user.id, workspace_id=workspace.id, role=WorkspaceRole.TEACHER
+    )
+    db_session.add(membership)
+    await db_session.flush()
+
+    exam = Exam(workspace_id=workspace.id, title="Zones Exam")
+    db_session.add(exam)
+    await db_session.flush()
+    version = ExamVersion(exam_id=exam.id, version_number=1, is_active=True)
+    db_session.add(version)
+    await db_session.flush()
+    template = ExamTemplate(
+        exam_version_id=version.id,
+        template_hash="abc125",
+        original_filename="template.pdf",
+        storage_url="bucket/templates/template3.pdf",
+        content_type="application/pdf",
+        file_size=100,
+        page_count=1,
+        dpi=250,
+        metadata_json={"status": "zones_extracted"},
+    )
+    db_session.add(template)
+    await db_session.flush()
+
+    valid_zone = TemplateZone(
+        template_id=template.id,
+        page_index=0,
+        question_key="Q1",
+        bbox_x=20,
+        bbox_y=20,
+        bbox_width=150,
+        bbox_height=80,
+        pad_ratio=0.1,
+        confidence=0.8,
+        source="auto_pymupdf",
+        is_validated=False,
+        edit_source="auto",
+    )
+    invalid_zone = TemplateZone(
+        template_id=template.id,
+        page_index=99,
+        question_key="Q2",
+        bbox_x=20,
+        bbox_y=120,
+        bbox_width=150,
+        bbox_height=80,
+        pad_ratio=0.1,
+        confidence=0.8,
+        source="auto_pymupdf",
+        is_validated=False,
+        edit_source="auto",
+    )
+    db_session.add_all([valid_zone, invalid_zone])
+    await db_session.commit()
+
+    response = await client.post(
+        f"/api/exams/templates/{template.id}/zones/validate",
+        headers={**auth_headers(user), "X-Workspace-Id": str(workspace.id)},
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["validated_count"] == 1
+    assert payload["status"] == "zones_validated"
+    assert str(invalid_zone.id) in payload["invalid_zone_ids"]
+
+    zone_db = await db_session.get(TemplateZone, valid_zone.id)
+    assert zone_db is not None
+    assert zone_db.is_validated is True
+    assert zone_db.validated_by == user.id
+
+    template_db = await db_session.get(ExamTemplate, template.id)
+    assert template_db is not None
+    assert template_db.metadata_json["status"] == "zones_validated"
+
+
+@pytest.mark.asyncio
+async def test_bulk_patch_and_reset_template_zones(
+    client: AsyncClient,
+    db_session: AsyncSession,
+    auth_headers,
+    workspace_factory,
+    membership_factory,
+):
+    user = User(
+        email="zones-bulk@example.com",
+        hashed_password=hash_password("password123"),
+        is_active=True,
+    )
+    workspace = workspace_factory(name="Zones Bulk Workspace")
+    db_session.add_all([user, workspace])
+    await db_session.flush()
+    membership = membership_factory(
+        user_id=user.id, workspace_id=workspace.id, role=WorkspaceRole.TEACHER
+    )
+    db_session.add(membership)
+    await db_session.flush()
+
+    exam = Exam(workspace_id=workspace.id, title="Zones Exam")
+    db_session.add(exam)
+    await db_session.flush()
+    version = ExamVersion(exam_id=exam.id, version_number=1, is_active=True)
+    db_session.add(version)
+    await db_session.flush()
+    template = ExamTemplate(
+        exam_version_id=version.id,
+        template_hash="abc126",
+        original_filename="template.pdf",
+        storage_url="bucket/templates/template4.pdf",
+        content_type="application/pdf",
+        file_size=200,
+        page_count=1,
+        dpi=250,
+        metadata_json={"status": "zones_extracted"},
+    )
+    db_session.add(template)
+    await db_session.flush()
+
+    zone = TemplateZone(
+        template_id=template.id,
+        page_index=0,
+        question_key="Q1",
+        bbox_x=10,
+        bbox_y=10,
+        bbox_width=100,
+        bbox_height=100,
+        pad_ratio=0.1,
+        confidence=0.8,
+        source="auto_pymupdf",
+        is_validated=False,
+        edit_source="auto",
+    )
+    db_session.add(zone)
+    await db_session.commit()
+
+    bulk_response = await client.patch(
+        f"/api/exams/templates/{template.id}/zones",
+        json={
+            "items": [
+                {
+                    "zone_id": str(zone.id),
+                    "bbox_x": 42,
+                    "bbox_y": 52,
+                    "change_reason": "bulk adjust",
+                    "edit_source": "manual",
+                }
+            ]
+        },
+        headers={**auth_headers(user), "X-Workspace-Id": str(workspace.id)},
+    )
+
+    assert bulk_response.status_code == 200
+    bulk_payload = bulk_response.json()
+    assert bulk_payload["updated_count"] == 1
+    assert bulk_payload["zones"][0]["bbox_x"] == 42
+    assert bulk_payload["zones"][0]["last_edited_by"] == str(user.id)
+
+    reset_response = await client.post(
+        f"/api/exams/templates/{template.id}/zones/reset",
+        headers={**auth_headers(user), "X-Workspace-Id": str(workspace.id)},
+    )
+
+    assert reset_response.status_code == 200
+    reset_payload = reset_response.json()
+    assert reset_payload["deleted_count"] == 1
+
+    zone_result = await db_session.execute(
+        select(TemplateZone).where(TemplateZone.template_id == template.id)
+    )
+    assert zone_result.scalars().all() == []
