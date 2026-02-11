@@ -1,5 +1,6 @@
 """Complete submission processing pipeline (3 pillars)."""
 
+import logging
 from uuid import UUID
 
 from sqlalchemy import select
@@ -27,6 +28,8 @@ from app.models.enums import (
 )
 from app.utils.fuzzy_matching import fuzzy_match_student
 from app.utils.storage import storage
+
+logger = logging.getLogger(__name__)
 
 
 async def process_submission_pipeline(submission: Submission, db: AsyncSession):
