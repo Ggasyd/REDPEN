@@ -1,10 +1,12 @@
 """Complete submission processing pipeline (3 pillars)."""
 
+import logging
 from uuid import UUID
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.ml.alignment_service import alignment_service
 from app.ml.detection_service import detection_service
 from app.ml.ocr_service import ocr_service
 from app.ml.vision_service import vision_service
@@ -27,6 +29,8 @@ from app.models.enums import (
 from app.utils.fuzzy_matching import fuzzy_match_student
 from app.utils.storage import storage
 
+logger = logging.getLogger(__name__)
+
 
 async def process_submission_pipeline(submission: Submission, db: AsyncSession):
     """Complete pipeline for processing a submission.
@@ -44,9 +48,45 @@ async def process_submission_pipeline(submission: Submission, db: AsyncSession):
     # Step 1: Split PDF into pages (stub for MVP)
     pages = await split_pdf_to_pages(submission, db)
 
+    # Load active template (if configured)
+    template_bytes = None
+    result = await db.execute(
+        select(ExamVersion).where(ExamVersion.id == submission.exam_version_id)
+    )
+    exam_version = result.scalar_one_or_none()
+    if exam_version and exam_version.active_template_id:
+        from app.models import ExamTemplate
+
+        template_result = await db.execute(
+            select(ExamTemplate).where(
+                ExamTemplate.id == exam_version.active_template_id
+            )
+        )
+        template = template_result.scalar_one_or_none()
+        if template:
+            try:
+                template_bytes = storage.download_file(template.storage_url)
+            except Exception as e:
+                logger.warning(
+                    {
+                        "event": "alignment_template_download_failed",
+                        "submission_id": str(submission.id),
+                        "template_id": str(template.id),
+                        "error": str(e),
+                    }
+                )
+
     # Step 2-4: Process each page
+    alignment_scores: list[float] = []
     for page in pages:
+        page_alignment = await align_submission_page(page, submission, template_bytes)
+        if page_alignment is not None:
+            alignment_scores.append(page_alignment.score)
         await process_page(page, submission, db)
+
+    if alignment_scores:
+        best_alignment = max(alignment_scores)
+        submission.alignment_score = best_alignment
 
     # Step 5: Assign student
     await assign_student_to_submission(submission, db)
@@ -78,6 +118,83 @@ async def split_pdf_to_pages(
 
     submission.page_count = 1
     return [page]
+
+
+async def align_submission_page(
+    page: SubmissionPage,
+    submission: Submission,
+    template_bytes: bytes | None,
+):
+    """Align submission page against active template and persist alignment metadata."""
+    if not template_bytes:
+        submission.alignment_method = "none"
+        submission.alignment_rotation = 0
+        if submission.alignment_score is None:
+            submission.alignment_score = 0.0
+        return None
+
+    try:
+        page_bytes = storage.download_file(page.storage_url)
+    except Exception as e:
+        logger.warning(
+            {
+                "event": "alignment_page_download_failed",
+                "submission_id": str(submission.id),
+                "page_id": str(page.id),
+                "error": str(e),
+            }
+        )
+        submission.alignment_method = "none"
+        submission.alignment_rotation = 0
+        submission.alignment_score = 0.0
+        return None
+
+    result = alignment_service.align_to_template(
+        submission_page_bytes=page_bytes,
+        template_page_bytes=template_bytes,
+    )
+
+    submission.alignment_score = result.score
+    submission.alignment_method = result.method
+    submission.alignment_rotation = result.rotation
+
+    debug_overlay_url = None
+    if result.debug_overlay_bytes:
+        try:
+            debug_overlay_url = storage.upload_bytes(
+                result.debug_overlay_bytes,
+                object_name=f"{submission.id}/{page.id}.png",
+                content_type="image/png",
+                folder="alignment-debug",
+            )
+        except Exception as exc:
+            logger.warning(
+                {
+                    "event": "alignment_debug_overlay_upload_failed",
+                    "submission_id": str(submission.id),
+                    "page_id": str(page.id),
+                    "method": result.method,
+                    "error": str(exc),
+                }
+            )
+
+    logger.info(
+        {
+            "event": "alignment_page_result",
+            "submission_id": str(submission.id),
+            "page_id": str(page.id),
+            "method": result.method,
+            "rotation": result.rotation,
+            "score": round(result.score, 4),
+            "success": result.success,
+            "inliers": result.homography_meta.get("inliers"),
+            "moving_keypoints": result.homography_meta.get("moving_keypoints"),
+            "fixed_keypoints": result.homography_meta.get("fixed_keypoints"),
+            "debug_overlay_url": debug_overlay_url,
+        }
+    )
+
+    return result
 
 
 async def process_page(page: SubmissionPage, submission: Submission, db: AsyncSession):
