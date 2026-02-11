@@ -5,10 +5,10 @@ Date: 2026-02-10
 ## Résumé
 
 - ✅ **(1) Upload template (avec champ fichier dans `ExamTemplate`)**: **implémenté**.
-- ⚠️ **(2) Extract auto + insert zones**: **partiellement implémenté** (extraction utilitaire présente, mais pas branchée à un endpoint/workflow persistant).
-- ❌ **(3) GET preview zones**: **non implémenté** (aucune route dédiée détectée).
-- ❌ **(4) PATCH/PUT ajustement + validate**: **non implémenté côté API** (modèle DB prêt mais pas d'endpoint).
-- ⚠️ **(5) Audit/versioning**: **partiellement implémenté** (tables/modèles présents, pas de logique applicative trouvée pour écrire les révisions).
+- ✅ **(2) Extract auto + insert zones**: **implémenté**.
+- ✅ **(3) GET preview zones**: **implémenté**.
+- ✅ **(4) PATCH/PUT ajustement + validate**: **implémenté**.
+- ✅ **(5) Audit/versioning**: **implémenté** (révisions créées lors des extractions et mises à jour de zones).
 
 ## Détails
 
@@ -21,28 +21,31 @@ Date: 2026-02-10
 
 ### 2) Extract auto + insert zones
 
-- Fonction d'extraction PDF disponible (`extract_template_zones_from_pdf`) via PyMuPDF.
-- **Aucun appel** détecté vers cette fonction dans les routes/services.
-- Conclusion: extraction candidate existe mais **pas intégrée** à un flux complet "extract + insert zones".
+- Route API présente: `POST /api/exams/templates/{template_id}/zones/extract`.
+- La route télécharge le PDF, appelle `extract_template_zones_from_pdf`, supprime les zones existantes, insère les nouvelles `TemplateZone`, met à jour `page_count` et crée une entrée de révision (`change_type="extract_insert"`) par zone.
+- Test unitaire présent pour extraction + insertion persistée.
 
 ### 3) GET preview zones
 
-- Aucune route `/zones` ou `/preview` liée aux templates/zones détectée dans l'API examens.
-- Le seul `preview` détecté est côté GDPR retention mode, non lié aux zones de template.
+- Route API présente: `GET /api/exams/templates/{template_id}/zones`.
+- Retourne la liste des zones triées (`page_index`, `question_key`) au format `TemplateZoneResponse`.
+- Test unitaire présent pour la récupération preview après extraction.
 
 ### 4) PATCH/PUT ajustement + validate
 
-- Champs de validation/édition existent dans `TemplateZone` (`is_validated`, `validated_at`, `validated_by`, `last_edited_*`, `edit_source`).
-- Mais aucune route `PATCH`/`PUT` dédiée aux zones détectée dans l'API.
+- Routes API présentes:
+  - `PATCH /api/exams/templates/{template_id}/zones/{zone_id}`
+  - `PUT /api/exams/templates/{template_id}/zones/{zone_id}` (alias de `PATCH`)
+- Le patch gère les ajustements de bbox/champs de zone, la validation (`is_validated`, `validated_at`, `validated_by`) et les métadonnées d'édition (`last_edited_at`, `last_edited_by`, `edit_source`).
+- En cas de changement, une révision est écrite (`change_type="update"`).
+- Test unitaire présent sur mise à jour + validation + création de révision.
 
 ### 5) Audit/versioning
 
-- Modèle `TemplateZoneRevision` + migration DB de création de table présents.
-- **Pas de logique applicative trouvée** (service/router) qui crée des lignes de révision lors d'éditions/validations.
+- Modèle `TemplateZoneRevision` présent et relié à `TemplateZone`.
+- Fonction `_create_zone_revision(...)` implémentée pour incrémenter `revision_number` et persister un snapshot complet des données de zone.
+- Cette fonction est appelée dans les workflows d'extraction (`extract_insert`) et de mise à jour (`update`), ce qui couvre l'audit/versioning applicatif.
 
 ## Conclusion opérationnelle
 
-Le socle data est avancé (templates, zones, validation, révisions), mais l'API métier autour des zones est incomplète. En l'état:
-
-- prêt pour upload template,
-- non prêt pour un workflow complet de zones (auto-extract persisté, preview, ajustement/validation, audit effectif).
+Les 5 fonctionnalités demandées sont bien implémentées côté API + modèle de données, avec des tests ciblés pour les cas critiques (upload, extract+preview, update+validate+revision).

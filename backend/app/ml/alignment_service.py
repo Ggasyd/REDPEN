@@ -127,6 +127,8 @@ class AlignmentService:
             }
         )
 
+            )
+
         if best.aligned_image_bytes:
             return best
 
@@ -299,6 +301,10 @@ class AlignmentService:
                 "score": score,
                 "aligned": aligned,
                 "debug_overlay": cv2.addWeighted(aligned, 0.6, fixed, 0.4, 0),
+            return {
+                "success": score >= 0.45,
+                "score": score,
+                "aligned": aligned,
                 "meta": {
                     "method": "ecc",
                     "correlation": score,
