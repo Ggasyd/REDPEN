@@ -67,14 +67,7 @@ async def process_submission_pipeline(submission: Submission, db: AsyncSession):
             try:
                 template_bytes = storage.download_file(template.storage_url)
             except Exception as e:
-                logger.warning(
-                    {
-                        "event": "alignment_template_download_failed",
-                        "submission_id": str(submission.id),
-                        "template_id": str(template.id),
-                        "error": str(e),
-                    }
-                )
+                print(f"Warning: Could not download template {template.id}: {e}")
 
     # Step 2-4: Process each page
     alignment_scores: list[float] = []
@@ -136,14 +129,7 @@ async def align_submission_page(
     try:
         page_bytes = storage.download_file(page.storage_url)
     except Exception as e:
-        logger.warning(
-            {
-                "event": "alignment_page_download_failed",
-                "submission_id": str(submission.id),
-                "page_id": str(page.id),
-                "error": str(e),
-            }
-        )
+        print(f"Warning: Could not download page {page.id} for alignment: {e}")
         submission.alignment_method = "none"
         submission.alignment_rotation = 0
         submission.alignment_score = 0.0
@@ -157,42 +143,6 @@ async def align_submission_page(
     submission.alignment_score = result.score
     submission.alignment_method = result.method
     submission.alignment_rotation = result.rotation
-
-    debug_overlay_url = None
-    if result.debug_overlay_bytes:
-        try:
-            debug_overlay_url = storage.upload_bytes(
-                result.debug_overlay_bytes,
-                object_name=f"{submission.id}/{page.id}-{uuid4()}.png",
-                content_type="image/png",
-                folder="alignment-debug",
-            )
-        except Exception as exc:
-            logger.warning(
-                {
-                    "event": "alignment_debug_overlay_upload_failed",
-                    "submission_id": str(submission.id),
-                    "page_id": str(page.id),
-                    "method": result.method,
-                    "error": str(exc),
-                }
-            )
-
-    logger.info(
-        {
-            "event": "alignment_page_result",
-            "submission_id": str(submission.id),
-            "page_id": str(page.id),
-            "method": result.method,
-            "rotation": result.rotation,
-            "score": round(result.score, 4),
-            "success": result.success,
-            "inliers": result.homography_meta.get("inliers"),
-            "moving_keypoints": result.homography_meta.get("moving_keypoints"),
-            "fixed_keypoints": result.homography_meta.get("fixed_keypoints"),
-            "debug_overlay_url": debug_overlay_url,
-        }
-    )
 
     return result
 

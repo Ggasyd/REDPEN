@@ -36,7 +36,11 @@ class AlignmentService:
         submission_page_bytes: bytes,
         template_page_bytes: bytes,
     ) -> AlignmentResult:
-        """Align page to template with rotation search and method fallback."""
+        """Align page to template with rotation search and method fallback
+        Tries rotations [0, 90, 180, 270].
+        For each rotation, tries ORB then AKAZE then ECC.
+        Returns best scoring result with score normalized in [0, 1].
+        """
         submission_image = self._decode_image(submission_page_bytes)
         template_image = self._decode_image(template_page_bytes)
 
@@ -48,7 +52,6 @@ class AlignmentService:
                 rotation=0,
                 homography_meta={"reason": "decode_failed"},
                 success=False,
-                debug_overlay_bytes=None,
             )
 
         template_height, template_width = template_image.shape[:2]
@@ -57,39 +60,46 @@ class AlignmentService:
         for rotation in (0, 90, 180, 270):
             rotated = self._rotate_image(submission_image, rotation)
 
-            for method_name, raw in (
-                (
-                    "orb",
-                    self._align_with_features(
-                        moving=rotated,
-                        fixed=template_image,
-                        method_name="orb",
-                        feature_extractor=cv2.ORB_create(nfeatures=self.ORB_FEATURES),
-                    ),
-                ),
-                (
-                    "akaze",
-                    self._align_with_features(
-                        moving=rotated,
-                        fixed=template_image,
-                        method_name="akaze",
-                        feature_extractor=cv2.AKAZE_create(),
-                    ),
-                ),
-                (
-                    "ecc",
-                    self._align_with_ecc(moving=rotated, fixed=template_image),
-                ),
-            ):
-                candidate = self._build_result(
-                    raw=raw,
-                    method=method_name,
-                    rotation=rotation,
-                    fallback_image=rotated,
-                )
-                best = self._pick_better(best, candidate)
-                if candidate.success and candidate.score >= 0.85:
-                    break
+            orb_result = self._align_with_features(
+                moving=rotated,
+                fixed=template_image,
+                method_name="orb",
+                feature_extractor=cv2.ORB_create(nfeatures=self.ORB_FEATURES),
+            )
+            candidate = self._build_result(
+                raw=orb_result,
+                method="orb",
+                rotation=rotation,
+                fallback_image=rotated,
+            )
+            best = self._pick_better(best, candidate)
+            if candidate.success and candidate.score >= 0.85:
+                continue
+
+            akaze_result = self._align_with_features(
+                moving=rotated,
+                fixed=template_image,
+                method_name="akaze",
+                feature_extractor=cv2.AKAZE_create(),
+            )
+            candidate = self._build_result(
+                raw=akaze_result,
+                method="akaze",
+                rotation=rotation,
+                fallback_image=rotated,
+            )
+            best = self._pick_better(best, candidate)
+            if candidate.success and candidate.score >= 0.85:
+                continue
+
+            ecc_result = self._align_with_ecc(moving=rotated, fixed=template_image)
+            candidate = self._build_result(
+                raw=ecc_result,
+                method="ecc",
+                rotation=rotation,
+                fallback_image=rotated,
+            )
+            best = self._pick_better(best, candidate)
 
         if best is None:
             return AlignmentResult(
@@ -99,21 +109,7 @@ class AlignmentService:
                 rotation=0,
                 homography_meta={"reason": "no_candidate"},
                 success=False,
-                debug_overlay_bytes=None,
             )
-
-        logger.info(
-            {
-                "event": "alignment_best_selected",
-                "method": best.method,
-                "rotation": best.rotation,
-                "score": round(best.score, 4),
-                "success": best.success,
-                "inliers": best.homography_meta.get("inliers"),
-                "moving_keypoints": best.homography_meta.get("moving_keypoints"),
-                "fixed_keypoints": best.homography_meta.get("fixed_keypoints"),
-            }
-        )
 
         if best.aligned_image_bytes:
             return best
@@ -126,7 +122,6 @@ class AlignmentService:
             rotation=best.rotation,
             homography_meta=best.homography_meta,
             success=best.success,
-            debug_overlay_bytes=best.debug_overlay_bytes,
         )
 
     def _align_with_features(
@@ -162,9 +157,9 @@ class AlignmentService:
         for pair in knn_matches:
             if len(pair) < 2:
                 continue
-            first, second = pair
-            if first.distance < 0.75 * second.distance:
-                good_matches.append(first)
+            m, n = pair
+            if m.distance < 0.75 * n.distance:
+                good_matches.append(m)
 
         if len(good_matches) < self.MIN_FEATURE_MATCHES:
             return {
@@ -201,10 +196,10 @@ class AlignmentService:
         inliers = int(inlier_mask.sum())
         inlier_ratio = inliers / max(len(good_matches), 1)
         success = inlier_ratio >= self.MIN_INLIER_RATIO
-
-        aligned = cv2.warpPerspective(
+        warped = cv2.warpPerspective(
             moving, homography, (fixed.shape[1], fixed.shape[0])
         )
+
         score = max(
             0.0,
             min(
@@ -214,25 +209,10 @@ class AlignmentService:
             ),
         )
 
-        logger.info(
-            {
-                "event": "alignment_feature_attempt",
-                "method": method_name,
-                "moving_keypoints": len(keypoints1),
-                "fixed_keypoints": len(keypoints2),
-                "good_matches": len(good_matches),
-                "inliers": inliers,
-                "inlier_ratio": round(inlier_ratio, 4),
-                "score": round(score, 4),
-                "success": success,
-            }
-        )
-
         return {
             "success": success,
             "score": score,
-            "aligned": aligned,
-            "debug_overlay": cv2.addWeighted(aligned, 0.6, fixed, 0.4, 0),
+            "aligned": warped,
             "meta": {
                 "method": method_name,
                 "moving_keypoints": len(keypoints1),
@@ -255,7 +235,7 @@ class AlignmentService:
         )
 
         try:
-            correlation, warp_matrix = cv2.findTransformECC(
+            cc, warp_matrix = cv2.findTransformECC(
                 fixed_gray,
                 moving_gray,
                 warp_matrix,
@@ -270,23 +250,11 @@ class AlignmentService:
                 (fixed.shape[1], fixed.shape[0]),
                 flags=cv2.INTER_LINEAR + cv2.WARP_INVERSE_MAP,
             )
-            score = float(max(0.0, min(1.0, correlation)))
-            success = score >= 0.45
-
-            logger.info(
-                {
-                    "event": "alignment_ecc_attempt",
-                    "method": "ecc",
-                    "correlation": round(score, 4),
-                    "success": success,
-                }
-            )
-
+            score = float(max(0.0, min(1.0, cc)))
             return {
-                "success": success,
+                "success": score >= 0.45,
                 "score": score,
                 "aligned": aligned,
-                "debug_overlay": cv2.addWeighted(aligned, 0.6, fixed, 0.4, 0),
                 "meta": {
                     "method": "ecc",
                     "correlation": score,
@@ -303,10 +271,10 @@ class AlignmentService:
             }
 
     def _decode_image(self, image_bytes: bytes) -> np.ndarray | None:
-        array = np.frombuffer(image_bytes, dtype=np.uint8)
-        if array.size == 0:
+        arr = np.frombuffer(image_bytes, dtype=np.uint8)
+        if arr.size == 0:
             return None
-        return cv2.imdecode(array, cv2.IMREAD_COLOR)
+        return cv2.imdecode(arr, cv2.IMREAD_COLOR)
 
     def _encode_png(self, image: np.ndarray) -> bytes:
         ok, encoded = cv2.imencode(".png", image)
@@ -331,13 +299,9 @@ class AlignmentService:
     ) -> AlignmentResult:
         aligned = raw.get("aligned")
         aligned_bytes = self._encode_png(aligned) if aligned is not None else b""
+
         if not aligned_bytes:
             aligned_bytes = self._encode_png(fallback_image)
-
-        debug_overlay = raw.get("debug_overlay")
-        debug_overlay_bytes = (
-            self._encode_png(debug_overlay) if debug_overlay is not None else None
-        )
 
         return AlignmentResult(
             aligned_image_bytes=aligned_bytes,
@@ -346,7 +310,6 @@ class AlignmentService:
             rotation=rotation,
             homography_meta=raw.get("meta", {}),
             success=bool(raw.get("success", False)),
-            debug_overlay_bytes=debug_overlay_bytes,
         )
 
     def _pick_better(
