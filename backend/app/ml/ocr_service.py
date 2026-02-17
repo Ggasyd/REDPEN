@@ -2,7 +2,9 @@
 
 import base64
 
+import cv2
 import httpx
+import numpy as np
 
 from app.config import settings
 
@@ -25,10 +27,8 @@ class OCRService:
         Returns:
             {"text": str, "confidence": float, "blocks": List[Dict]}
         """
-        # Encode image to base64
         image_base64 = base64.b64encode(image_bytes).decode("utf-8")
 
-        # Prepare request
         headers = {
             "Authorization": f"Bearer {self.api_key}",
             "Content-Type": "application/json",
@@ -55,46 +55,120 @@ class OCRService:
             response.raise_for_status()
             data = response.json()
 
-        # Extract text from response
         text = data["choices"][0]["message"]["content"]
 
         return {
             "text": text.strip(),
-            "confidence": 0.9,  # Mistral doesn't provide confidence, using default
-            "blocks": [],  # Would need layout analysis
+            "confidence": 0.9,
+            "blocks": [],
         }
 
     async def extract_layout(self, image_bytes: bytes) -> list[dict]:
-        """Extract layout and text blocks (horizontal slices for geometric pillar).
-
-        Returns:
-            List of {"bbox": [x, y, w, h], "text": str}
-        """
-        # Stub: In production, use Mistral OCR with layout analysis prompt
-        # For now, return mock layout
+        """Extract layout and text blocks (horizontal slices for geometric pillar)."""
         prompt = """Analyze the layout of this exam page.
         Identify all text blocks with their positions (top, middle, bottom).
         Return each block with: position, text content."""
 
         result = await self.extract_text_from_image(image_bytes, prompt)
 
-        # Parse response into blocks (simplified for MVP)
         return [
             {
-                "bbox": [0, 0, 100, 100],  # Mock bbox
+                "bbox": [0, 0, 100, 100],
                 "text": result["text"],
                 "confidence": result["confidence"],
             }
         ]
 
+    async def extract_text_from_crop(
+        self,
+        image_bytes: bytes,
+        bbox: dict,
+        preprocessing: bool = True,
+        ink_threshold: float = 0.01,
+    ) -> dict:
+        """Extract text from a cropped zone with lightweight preprocessing.
+
+        Returns:
+            {
+              "text": str,
+              "confidence": float,
+              "is_blank": bool,
+              "ink_ratio": float,
+              "processed_image_bytes": bytes,
+            }
+        """
+        arr = np.frombuffer(image_bytes, np.uint8)
+        image = cv2.imdecode(arr, cv2.IMREAD_COLOR)
+        if image is None:
+            return {
+                "text": "",
+                "confidence": 0.0,
+                "is_blank": True,
+                "ink_ratio": 0.0,
+                "processed_image_bytes": b"",
+            }
+
+        h, w = image.shape[:2]
+        x = max(0, int(bbox.get("x", 0)))
+        y = max(0, int(bbox.get("y", 0)))
+        bw = max(1, int(bbox.get("width", w)))
+        bh = max(1, int(bbox.get("height", h)))
+        x2 = min(w, x + bw)
+        y2 = min(h, y + bh)
+
+        crop = image[y:y2, x:x2]
+        if crop.size == 0:
+            return {
+                "text": "",
+                "confidence": 0.0,
+                "is_blank": True,
+                "ink_ratio": 0.0,
+                "processed_image_bytes": b"",
+            }
+
+        gray = cv2.cvtColor(crop, cv2.COLOR_BGR2GRAY)
+        processed = gray
+        if preprocessing:
+            processed = cv2.adaptiveThreshold(
+                gray,
+                255,
+                cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
+                cv2.THRESH_BINARY,
+                31,
+                11,
+            )
+
+        ink_ratio = float(np.mean(processed < 200))
+        is_blank = ink_ratio < ink_threshold
+
+        ok, encoded = cv2.imencode(".png", processed)
+        processed_bytes = encoded.tobytes() if ok else b""
+
+        if is_blank:
+            return {
+                "text": "",
+                "confidence": 0.0,
+                "is_blank": True,
+                "ink_ratio": ink_ratio,
+                "processed_image_bytes": processed_bytes,
+            }
+
+        ocr_result = await self.extract_text_from_image(
+            processed_bytes,
+            prompt="Extract only the handwritten/student answer in this cropped response zone.",
+        )
+        return {
+            "text": ocr_result.get("text", "").strip(),
+            "confidence": ocr_result.get("confidence", 0.0),
+            "is_blank": False,
+            "ink_ratio": ink_ratio,
+            "processed_image_bytes": processed_bytes,
+        }
+
     async def extract_student_name(
         self, image_bytes: bytes, name_zone_bbox: dict | None = None
     ) -> dict:
-        """Extract student name from designated zone.
-
-        Returns:
-            {"name": str, "confidence": float}
-        """
+        """Extract student name from designated zone."""
         prompt = """Extract ONLY the student name from this image.
         Look for fields labeled 'Nom' or 'Prénom' or 'Name'.
         Return just the name, nothing else."""
@@ -107,5 +181,4 @@ class OCRService:
         }
 
 
-# Global OCR service instance
 ocr_service = OCRService()
