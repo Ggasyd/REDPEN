@@ -1,15 +1,20 @@
-"""Complete submission processing pipeline (3 pillars)."""
+"""Complete submission processing pipeline (legacy + template-first V2)."""
 
+import logging
+from collections import defaultdict
 from uuid import UUID
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.config import settings
+from app.ml.alignment_service import AlignmentResult, alignment_service
 from app.ml.detection_service import detection_service
 from app.ml.ocr_service import ocr_service
 from app.ml.vision_service import vision_service
 from app.models import (
     AnswerBlock,
+    ExamTemplate,
     ExamVersion,
     GradeDecision,
     Question,
@@ -17,6 +22,7 @@ from app.models import (
     StudentAssignment,
     Submission,
     SubmissionPage,
+    TemplateZone,
 )
 from app.models.enums import (
     AssignMethod,
@@ -27,35 +33,312 @@ from app.models.enums import (
 from app.utils.fuzzy_matching import fuzzy_match_student
 from app.utils.storage import storage
 
+logger = logging.getLogger(__name__)
+
 
 async def process_submission_pipeline(submission: Submission, db: AsyncSession):
-    """Complete pipeline for processing a submission.
+    """Process submission using V2 (feature-flagged) or legacy flow."""
+    pipeline_v2_enabled = settings.pipeline_v2_enabled
+    if pipeline_v2_enabled:
+        await process_submission_pipeline_v2(submission, db)
+        return
 
-    Steps:
-    1. Split PDF into pages
-    2. Extract answer blocks (3 pillars)
-    3. OCR/HTR for transcription
-    4. Assign questions
-    5. Assign student
-    6. Generate grade proposal
-    7. Flag for review if needed
-    """
+    await process_submission_pipeline_v1(submission, db)
 
-    # Step 1: Split PDF into pages (stub for MVP)
+
+async def process_submission_pipeline_v2(submission: Submission, db: AsyncSession):
+    """Template-first pipeline: template -> alignment -> zones -> OCR by zone."""
     pages = await split_pdf_to_pages(submission, db)
 
-    # Step 2-4: Process each page
+    template_context = await _load_template_context(submission, db)
+    if template_context is None:
+        logger.warning(
+            {
+                "event": "pipeline_v2_template_missing",
+                "submission_id": str(submission.id),
+            }
+        )
+        await process_submission_pipeline_v1(submission, db)
+        return
+
+    questions_result = await db.execute(
+        select(Question)
+        .where(Question.exam_version_id == submission.exam_version_id)
+        .order_by(Question.order_index)
+    )
+    questions = questions_result.scalars().all()
+    question_by_key = {
+        _normalize_question_key(question.question_number): question
+        for question in questions
+    }
+
+    total_zones = 0
+    processed_zones = 0
+    blank_zones = 0
+    successful_alignments = 0
+    failed_alignments = 0
+    alignment_scores: list[float] = []
+    best_alignment: AlignmentResult | None = None
+
     for page in pages:
-        await process_page(page, submission, db)
+        page_index = max(0, page.page_number - 1)
+        zones = template_context["zones_by_page"].get(page_index, [])
+        total_zones += len(zones)
 
-    # Step 5: Assign student
+        page_bytes = storage.download_file(page.storage_url)
+        template_page_bytes = template_context["template_pages"].get(page_index)
+
+        aligned_page_bytes = page_bytes
+        alignment_result = None
+        if template_page_bytes:
+            alignment_result = alignment_service.align_to_template(
+                submission_page_bytes=page_bytes,
+                template_page_bytes=template_page_bytes,
+            )
+            alignment_scores.append(alignment_result.score)
+            if alignment_result.success:
+                successful_alignments += 1
+            else:
+                failed_alignments += 1
+            if best_alignment is None or alignment_result.score > best_alignment.score:
+                best_alignment = alignment_result
+            aligned_page_bytes = alignment_result.aligned_image_bytes or page_bytes
+
+        for zone in zones:
+            crop = await ocr_service.extract_text_from_crop(
+                aligned_page_bytes,
+                bbox={
+                    "x": zone.bbox_x,
+                    "y": zone.bbox_y,
+                    "width": zone.bbox_width,
+                    "height": zone.bbox_height,
+                },
+                preprocessing=True,
+            )
+            processed_zones += 1
+            if crop["is_blank"]:
+                blank_zones += 1
+
+            normalized_key = _normalize_question_key(zone.question_key)
+            question = question_by_key.get(normalized_key)
+
+            block = AnswerBlock(
+                page_id=page.id,
+                question_id=question.id if question else None,
+                question_key=zone.question_key,
+                block_type=BlockType.TEXT,
+                assign_method=AssignMethod.GEOMETRIC,
+                bbox_x=zone.bbox_x,
+                bbox_y=zone.bbox_y,
+                bbox_width=zone.bbox_width,
+                bbox_height=zone.bbox_height,
+                transcription=crop.get("text", ""),
+                crop_url="",
+                confidence=crop.get("confidence", 0.0),
+                is_illegible=crop.get("is_blank", False),
+                needs_review=(crop.get("confidence", 0.0) < 0.7)
+                or crop.get("is_blank", False),
+                metadata_json={
+                    "pipeline": "v2",
+                    "ink_ratio": crop.get("ink_ratio", 0.0),
+                    "is_blank": crop.get("is_blank", False),
+                    "alignment_method": alignment_result.method
+                    if alignment_result
+                    else "none",
+                    "alignment_score": alignment_result.score
+                    if alignment_result
+                    else 0.0,
+                },
+            )
+            db.add(block)
+
+    if alignment_scores:
+        submission.alignment_score = max(alignment_scores)
+    if best_alignment:
+        submission.alignment_method = best_alignment.method
+        submission.alignment_rotation = best_alignment.rotation
+
+    metrics = _compute_v2_metrics(
+        total_zones=total_zones,
+        processed_zones=processed_zones,
+        blank_zones=blank_zones,
+        successful_alignments=successful_alignments,
+        failed_alignments=failed_alignments,
+        alignment_scores=alignment_scores,
+    )
+
+    if metrics["total_zones"] > 0 and metrics["successful_alignments"] == 0:
+        submission.status = SubmissionStatus.ERROR
+    elif (
+        metrics["alignment_average"] >= 0.75
+        and metrics["coverage_ratio"] >= 0.7
+        and metrics["blank_ratio"] <= 0.6
+    ):
+        submission.status = SubmissionStatus.PROCESSED
+    else:
+        submission.status = SubmissionStatus.NEEDS_REVIEW
+
+    logger.info(
+        {
+            "event": "pipeline_v2_status_decision",
+            "submission_id": str(submission.id),
+            "alignment_average": round(metrics["alignment_average"], 4),
+            "coverage_ratio": round(metrics["coverage_ratio"], 4),
+            "blank_ratio": round(metrics["blank_ratio"], 4),
+            "total_zones": metrics["total_zones"],
+            "processed_zones": metrics["processed_zones"],
+            "successful_alignments": metrics["successful_alignments"],
+            "failed_alignments": metrics["failed_alignments"],
+            "status": submission.status.value,
+        }
+    )
+
+    await db.flush()
+
     await assign_student_to_submission(submission, db)
-
-    # Step 6: Generate grade proposal
     await generate_grade_proposal(submission, db)
 
-    # Step 7: Determine if needs review
+
+async def process_submission_pipeline_v1(submission: Submission, db: AsyncSession):
+    """Legacy 3-pillar pipeline kept for rollback via feature flag."""
+    pages = await split_pdf_to_pages(submission, db)
+
+    template_bytes = None
+    result = await db.execute(
+        select(ExamVersion).where(ExamVersion.id == submission.exam_version_id)
+    )
+    exam_version = result.scalar_one_or_none()
+    if exam_version and exam_version.active_template_id:
+        template_result = await db.execute(
+            select(ExamTemplate).where(
+                ExamTemplate.id == exam_version.active_template_id
+            )
+        )
+        template = template_result.scalar_one_or_none()
+        if template:
+            try:
+                template_bytes = storage.download_file(template.storage_url)
+            except Exception as e:
+                logger.warning(
+                    {
+                        "event": "alignment_template_download_failed",
+                        "submission_id": str(submission.id),
+                        "template_id": str(template.id),
+                        "error": str(e),
+                    }
+                )
+
+    alignment_scores: list[float] = []
+    for page in pages:
+        page_alignment = await align_submission_page(page, submission, template_bytes)
+        if page_alignment is not None:
+            alignment_scores.append(page_alignment.score)
+        await process_page(page, submission, db)
+
+    if alignment_scores:
+        submission.alignment_score = max(alignment_scores)
+
+    await assign_student_to_submission(submission, db)
+    await generate_grade_proposal(submission, db)
     await flag_for_review_if_needed(submission, db)
+
+
+async def _load_template_context(
+    submission: Submission, db: AsyncSession
+) -> dict | None:
+    result = await db.execute(
+        select(ExamVersion).where(ExamVersion.id == submission.exam_version_id)
+    )
+    exam_version = result.scalar_one_or_none()
+    if not exam_version or not exam_version.active_template_id:
+        return None
+
+    template_result = await db.execute(
+        select(ExamTemplate).where(ExamTemplate.id == exam_version.active_template_id)
+    )
+    template = template_result.scalar_one_or_none()
+    if not template:
+        return None
+
+    try:
+        template_bytes = storage.download_file(template.storage_url)
+    except Exception as exc:
+        logger.warning(
+            {
+                "event": "pipeline_v2_template_download_failed",
+                "submission_id": str(submission.id),
+                "template_id": str(template.id),
+                "error": str(exc),
+            }
+        )
+        return None
+
+    template_pages = _render_template_pages(template_bytes)
+
+    zones_result = await db.execute(
+        select(TemplateZone)
+        .where(TemplateZone.template_id == template.id)
+        .order_by(TemplateZone.page_index, TemplateZone.question_key)
+    )
+    zones_by_page: dict[int, list[TemplateZone]] = defaultdict(list)
+    for zone in zones_result.scalars().all():
+        zones_by_page[zone.page_index].append(zone)
+
+    return {
+        "template": template,
+        "template_pages": template_pages,
+        "zones_by_page": zones_by_page,
+    }
+
+
+def _render_template_pages(template_bytes: bytes) -> dict[int, bytes]:
+    """Render template PDF pages to image bytes for alignment."""
+    try:
+        import fitz
+
+        rendered: dict[int, bytes] = {}
+        with fitz.open(stream=template_bytes, filetype="pdf") as document:
+            for index, page in enumerate(document):
+                pixmap = page.get_pixmap(matrix=fitz.Matrix(2, 2))
+                rendered[index] = pixmap.tobytes("png")
+        return rendered
+    except Exception:
+        return {0: template_bytes}
+
+
+def _normalize_question_key(value: str | None) -> str:
+    if not value:
+        return ""
+    normalized = value.strip().upper()
+    if normalized.startswith("Q"):
+        return normalized
+    return f"Q{normalized}"
+
+
+def _compute_v2_metrics(
+    *,
+    total_zones: int,
+    processed_zones: int,
+    blank_zones: int,
+    successful_alignments: int,
+    failed_alignments: int,
+    alignment_scores: list[float],
+) -> dict[str, float | int]:
+    """Compute explicit V2 metrics used by status decision and logs."""
+    coverage_ratio = processed_zones / max(total_zones, 1)
+    blank_ratio = blank_zones / max(total_zones, 1)
+    alignment_average = (
+        sum(alignment_scores) / len(alignment_scores) if alignment_scores else 0.0
+    )
+    return {
+        "total_zones": total_zones,
+        "processed_zones": processed_zones,
+        "successful_alignments": successful_alignments,
+        "failed_alignments": failed_alignments,
+        "coverage_ratio": coverage_ratio,
+        "blank_ratio": blank_ratio,
+        "alignment_average": alignment_average,
+    }
 
 
 async def split_pdf_to_pages(
@@ -65,11 +348,10 @@ async def split_pdf_to_pages(
 
     Stub: In production, use PyPDF2 and pdf2image.
     """
-    # For MVP, create single page
     page = SubmissionPage(
         submission_id=submission.id,
         page_number=1,
-        storage_url=submission.storage_url,  # Mock: use same as submission
+        storage_url=submission.storage_url,
         width=1920,
         height=1080,
     )
@@ -80,17 +362,67 @@ async def split_pdf_to_pages(
     return [page]
 
 
-async def process_page(page: SubmissionPage, submission: Submission, db: AsyncSession):
-    """Process a single page using 3-pillar architecture."""
-    # Download page image
+async def align_submission_page(
+    page: SubmissionPage,
+    submission: Submission,
+    template_bytes: bytes | None,
+):
+    """Align submission page against active template and persist alignment metadata."""
+    if not template_bytes:
+        submission.alignment_method = "none"
+        submission.alignment_rotation = 0
+        if submission.alignment_score is None:
+            submission.alignment_score = 0.0
+        return None
+
     try:
         page_bytes = storage.download_file(page.storage_url)
     except Exception as e:
-        # If download fails, skip (development mode without MinIO)
+        logger.warning(
+            {
+                "event": "alignment_page_download_failed",
+                "submission_id": str(submission.id),
+                "page_id": str(page.id),
+                "error": str(e),
+            }
+        )
+        submission.alignment_method = "none"
+        submission.alignment_rotation = 0
+        submission.alignment_score = 0.0
+        return None
+
+    result = alignment_service.align_to_template(
+        submission_page_bytes=page_bytes,
+        template_page_bytes=template_bytes,
+    )
+
+    submission.alignment_score = result.score
+    submission.alignment_method = result.method
+    submission.alignment_rotation = result.rotation
+
+    logger.info(
+        {
+            "event": "alignment_page_result",
+            "submission_id": str(submission.id),
+            "page_id": str(page.id),
+            "method": result.method,
+            "rotation": result.rotation,
+            "score": round(result.score, 4),
+            "success": result.success,
+        }
+    )
+
+    return result
+
+
+async def process_page(page: SubmissionPage, submission: Submission, db: AsyncSession):
+    """Process a single page using 3-pillar architecture."""
+    try:
+        page_bytes = storage.download_file(page.storage_url)
+    except Exception as e:
         print(f"Warning: Could not download page {page.id}: {e}")
         return
 
-    # Get exam questions
     result = await db.execute(
         select(Question)
         .join(ExamVersion)
@@ -103,16 +435,10 @@ async def process_page(page: SubmissionPage, submission: Submission, db: AsyncSe
         print("Warning: No questions found for exam version")
         return
 
-    # Pillar 1: Geometric (OCR + horizontal slicing)
     geometric_blocks = await extract_geometric_blocks(page_bytes, questions)
-
-    # Pillar 2: Semantic (Vision model classification)
     semantic_blocks = await extract_semantic_blocks(page_bytes, questions)
-
-    # Pillar 3: Detection (MCQ/Tables)
     detection_blocks = await extract_detection_blocks(page_bytes, questions)
 
-    # Merge and save blocks
     all_blocks = geometric_blocks + semantic_blocks + detection_blocks
 
     for block_data in all_blocks:
