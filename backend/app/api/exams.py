@@ -5,7 +5,7 @@ from datetime import UTC, datetime
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -76,6 +76,10 @@ class TemplateZoneResponse(BaseModel):
     confidence: float | None
     source: str
     is_validated: bool
+    validated_at: datetime | None
+    validated_by: str | None
+    last_edited_at: datetime | None
+    last_edited_by: str | None
     edit_source: str
 
 
@@ -101,6 +105,45 @@ class TemplateZoneExtractResponse(BaseModel):
     zones: list[TemplateZoneResponse]
 
 
+class TemplateZoneBulkPatchItem(BaseModel):
+    zone_id: str
+    page_index: int | None = None
+    question_key: str | None = None
+    bbox_x: int | None = None
+    bbox_y: int | None = None
+    bbox_width: int | None = None
+    bbox_height: int | None = None
+    pad_ratio: float | None = None
+    confidence: float | None = None
+    source: str | None = None
+    is_validated: bool | None = None
+    change_reason: str | None = None
+    edit_source: str | None = None
+
+
+class TemplateZonesBulkPatchRequest(BaseModel):
+    items: list[TemplateZoneBulkPatchItem] = Field(default_factory=list)
+
+
+class TemplateZonesBulkPatchResponse(BaseModel):
+    template_id: str
+    updated_count: int
+    zones: list[TemplateZoneResponse]
+
+
+class TemplateZonesValidateResponse(BaseModel):
+    template_id: str
+    validated_count: int
+    invalid_zone_ids: list[str]
+    status: str
+
+
+class TemplateZonesResetResponse(BaseModel):
+    template_id: str
+    deleted_count: int
+    status: str
+
+
 def _zone_to_response(zone: TemplateZone) -> TemplateZoneResponse:
     return TemplateZoneResponse(
         id=str(zone.id),
@@ -115,6 +158,10 @@ def _zone_to_response(zone: TemplateZone) -> TemplateZoneResponse:
         confidence=zone.confidence,
         source=zone.source,
         is_validated=zone.is_validated,
+        validated_at=zone.validated_at,
+        validated_by=(str(zone.validated_by) if zone.validated_by else None),
+        last_edited_at=zone.last_edited_at,
+        last_edited_by=(str(zone.last_edited_by) if zone.last_edited_by else None),
         edit_source=zone.edit_source,
     )
 
@@ -431,6 +478,14 @@ async def extract_and_insert_template_zones(
     template.metadata_json = {
         **(template.metadata_json or {}),
         "status": "zones_extracted",
+        "zones_detected": len(inserted_zones),
+        "page_count": page_count,
+        "extractor": "pymupdf",
+        "extractor_version": (
+            extracted_zones[0].get("extractor_version")
+            if extracted_zones
+            else "pymupdf_v2"
+        ),
     }
     await db.commit()
 
@@ -470,40 +525,13 @@ async def get_template_zones_preview(
     return [_zone_to_response(zone) for zone in zones]
 
 
-@router.patch(
-    "/templates/{template_id}/zones/{zone_id}",
-    response_model=TemplateZoneResponse,
-)
-async def patch_template_zone(
-    template_id: UUID,
-    zone_id: UUID,
+async def _apply_template_zone_patch(
+    *,
+    zone: TemplateZone,
     payload: TemplateZonePatch,
-    workspace_id: UUID = Depends(get_workspace_id),
-    membership: WorkspaceMember = Depends(require_teacher),
-    current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
-):
-    """Adjust and/or validate a template zone."""
-    template_result = await db.execute(
-        select(ExamTemplate)
-        .join(ExamVersion, ExamTemplate.exam_version_id == ExamVersion.id)
-        .join(Exam, ExamVersion.exam_id == Exam.id)
-        .where(ExamTemplate.id == template_id)
-        .where(Exam.workspace_id == workspace_id)
-    )
-    template = template_result.scalar_one_or_none()
-    if not template:
-        raise HTTPException(status_code=404, detail="Template not found")
-
-    zone_result = await db.execute(
-        select(TemplateZone)
-        .where(TemplateZone.id == zone_id)
-        .where(TemplateZone.template_id == template_id)
-    )
-    zone = zone_result.scalar_one_or_none()
-    if not zone:
-        raise HTTPException(status_code=404, detail="Zone not found")
-
+    current_user: User,
+    db: AsyncSession,
+) -> bool:
     changes_applied = False
 
     for field in [
@@ -549,9 +577,235 @@ async def patch_template_zone(
             changed_by=current_user.id,
             change_reason=payload.change_reason,
         )
+
+    return changes_applied
+
+
+@router.patch(
+    "/templates/{template_id}/zones/{zone_id}",
+    response_model=TemplateZoneResponse,
+)
+async def patch_template_zone(
+    template_id: UUID,
+    zone_id: UUID,
+    payload: TemplateZonePatch,
+    workspace_id: UUID = Depends(get_workspace_id),
+    membership: WorkspaceMember = Depends(require_teacher),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Adjust and/or validate a template zone."""
+    template_result = await db.execute(
+        select(ExamTemplate)
+        .join(ExamVersion, ExamTemplate.exam_version_id == ExamVersion.id)
+        .join(Exam, ExamVersion.exam_id == Exam.id)
+        .where(ExamTemplate.id == template_id)
+        .where(Exam.workspace_id == workspace_id)
+    )
+    template = template_result.scalar_one_or_none()
+    if not template:
+        raise HTTPException(status_code=404, detail="Template not found")
+
+    zone_result = await db.execute(
+        select(TemplateZone)
+        .where(TemplateZone.id == zone_id)
+        .where(TemplateZone.template_id == template_id)
+    )
+    zone = zone_result.scalar_one_or_none()
+    if not zone:
+        raise HTTPException(status_code=404, detail="Zone not found")
+
+    changes_applied = await _apply_template_zone_patch(
+        zone=zone,
+        payload=payload,
+        current_user=current_user,
+        db=db,
+    )
+
+    if changes_applied:
         await db.commit()
 
     return _zone_to_response(zone)
+
+
+@router.post(
+    "/templates/{template_id}/zones/validate",
+    response_model=TemplateZonesValidateResponse,
+)
+async def validate_template_zones(
+    template_id: UUID,
+    workspace_id: UUID = Depends(get_workspace_id),
+    membership: WorkspaceMember = Depends(require_teacher),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Validate all coherent zones for a template."""
+    template_result = await db.execute(
+        select(ExamTemplate)
+        .join(ExamVersion, ExamTemplate.exam_version_id == ExamVersion.id)
+        .join(Exam, ExamVersion.exam_id == Exam.id)
+        .where(ExamTemplate.id == template_id)
+        .where(Exam.workspace_id == workspace_id)
+    )
+    template = template_result.scalar_one_or_none()
+    if not template:
+        raise HTTPException(status_code=404, detail="Template not found")
+
+    zones_result = await db.execute(
+        select(TemplateZone).where(TemplateZone.template_id == template_id)
+    )
+    zones = zones_result.scalars().all()
+
+    invalid_zone_ids: list[str] = []
+    validated_count = 0
+    now = datetime.now(UTC).replace(tzinfo=None)
+    for zone in zones:
+        is_bbox_valid = zone.bbox_width > 0 and zone.bbox_height > 0
+        is_page_valid = zone.page_index >= 0 and zone.page_index < max(
+            1, template.page_count
+        )
+        if not is_bbox_valid or not is_page_valid:
+            invalid_zone_ids.append(str(zone.id))
+            continue
+
+        if not zone.is_validated:
+            zone.is_validated = True
+            zone.validated_at = now
+            zone.validated_by = current_user.id
+            zone.last_edited_at = now
+            zone.last_edited_by = current_user.id
+            zone.edit_source = "manual"
+            await db.flush()
+            await _create_zone_revision(
+                db=db,
+                zone=zone,
+                change_type="bulk_validate",
+                changed_by=current_user.id,
+                change_reason="bulk validation",
+            )
+            validated_count += 1
+
+    template.metadata_json = {
+        **(template.metadata_json or {}),
+        "status": "zones_validated",
+        "zones_validated": sum(1 for zone in zones if zone.is_validated),
+        "zones_invalid": len(invalid_zone_ids),
+    }
+
+    await db.commit()
+
+    return TemplateZonesValidateResponse(
+        template_id=str(template.id),
+        validated_count=validated_count,
+        invalid_zone_ids=invalid_zone_ids,
+        status="zones_validated",
+    )
+
+
+@router.post(
+    "/templates/{template_id}/zones/reset",
+    response_model=TemplateZonesResetResponse,
+)
+async def reset_template_zones(
+    template_id: UUID,
+    workspace_id: UUID = Depends(get_workspace_id),
+    membership: WorkspaceMember = Depends(require_teacher),
+    db: AsyncSession = Depends(get_db),
+):
+    """Reset extracted zones for a template."""
+    template_result = await db.execute(
+        select(ExamTemplate)
+        .join(ExamVersion, ExamTemplate.exam_version_id == ExamVersion.id)
+        .join(Exam, ExamVersion.exam_id == Exam.id)
+        .where(ExamTemplate.id == template_id)
+        .where(Exam.workspace_id == workspace_id)
+    )
+    template = template_result.scalar_one_or_none()
+    if not template:
+        raise HTTPException(status_code=404, detail="Template not found")
+
+    zones_result = await db.execute(
+        select(TemplateZone).where(TemplateZone.template_id == template_id)
+    )
+    zones = zones_result.scalars().all()
+    deleted_count = len(zones)
+
+    for zone in zones:
+        await db.delete(zone)
+
+    template.metadata_json = {
+        **(template.metadata_json or {}),
+        "status": "uploaded",
+        "zones_detected": 0,
+        "zones_validated": 0,
+    }
+
+    await db.commit()
+
+    return TemplateZonesResetResponse(
+        template_id=str(template.id),
+        deleted_count=deleted_count,
+        status="uploaded",
+    )
+
+
+@router.patch(
+    "/templates/{template_id}/zones",
+    response_model=TemplateZonesBulkPatchResponse,
+)
+async def bulk_patch_template_zones(
+    template_id: UUID,
+    payload: TemplateZonesBulkPatchRequest,
+    workspace_id: UUID = Depends(get_workspace_id),
+    membership: WorkspaceMember = Depends(require_teacher),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Bulk adjust template zones in a single request."""
+    template_result = await db.execute(
+        select(ExamTemplate)
+        .join(ExamVersion, ExamTemplate.exam_version_id == ExamVersion.id)
+        .join(Exam, ExamVersion.exam_id == Exam.id)
+        .where(ExamTemplate.id == template_id)
+        .where(Exam.workspace_id == workspace_id)
+    )
+    template = template_result.scalar_one_or_none()
+    if not template:
+        raise HTTPException(status_code=404, detail="Template not found")
+
+    updated_zones: list[TemplateZone] = []
+    updated_count = 0
+    for item in payload.items:
+        zone_result = await db.execute(
+            select(TemplateZone)
+            .where(TemplateZone.id == UUID(item.zone_id))
+            .where(TemplateZone.template_id == template_id)
+        )
+        zone = zone_result.scalar_one_or_none()
+        if not zone:
+            raise HTTPException(
+                status_code=404, detail=f"Zone not found: {item.zone_id}"
+            )
+
+        patch_payload = TemplateZonePatch(**item.model_dump(exclude={"zone_id"}))
+        changes_applied = await _apply_template_zone_patch(
+            zone=zone,
+            payload=patch_payload,
+            current_user=current_user,
+            db=db,
+        )
+        if changes_applied:
+            updated_count += 1
+        updated_zones.append(zone)
+
+    if updated_count:
+        await db.commit()
+
+    return TemplateZonesBulkPatchResponse(
+        template_id=str(template.id),
+        updated_count=updated_count,
+        zones=[_zone_to_response(zone) for zone in updated_zones],
+    )
 
 
 @router.put(

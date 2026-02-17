@@ -64,8 +64,9 @@ async def process_submission_async(submission_id: str):
             # Run full pipeline
             await process_submission_pipeline(submission, db)
 
-            # Update status
-            submission.status = SubmissionStatus.PROCESSED
+            # Pipeline V2 may set status explicitly; keep legacy default behavior
+            if submission.status == SubmissionStatus.PROCESSING:
+                submission.status = SubmissionStatus.PROCESSED
             await db.commit()
 
         except Exception as e:
