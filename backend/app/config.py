@@ -58,6 +58,8 @@ class Settings(BaseSettings):
     gemini_model: str = "gemini-1.5-flash"
     mistral_ocr_model: str = "pixtral-12b-2409"
 
+    # Pipeline
+    pipeline_v2_enabled: bool = False
     # CORS
     cors_origins: str | list[str] = '["http://localhost:3000","http://localhost:8000"]'
 
