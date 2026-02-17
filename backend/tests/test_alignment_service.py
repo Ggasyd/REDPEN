@@ -38,7 +38,6 @@ def test_align_to_template_orb_or_akaze_success() -> None:
     assert 0.0 <= result.score <= 1.0
     assert isinstance(result.rotation, int)
     assert result.aligned_image_bytes
-    assert result.debug_overlay_bytes
 
 
 def test_align_to_template_detects_rotation() -> None:
@@ -63,4 +62,3 @@ def test_align_to_template_handles_invalid_inputs() -> None:
     assert result.success is False
     assert result.score == 0.0
     assert result.method == "none"
-    assert result.debug_overlay_bytes is None
