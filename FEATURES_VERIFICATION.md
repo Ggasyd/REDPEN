@@ -1,48 +1,64 @@
-# Vérification des 5 fonctionnalités templates/zones
+# Vérification des fonctionnalités templates/zones + alignement + pipeline V2
 
-Date: 2026-02-10
+Date: 2026-02-17
 
 ## Résumé
 
-- ✅ **(1) Upload template (avec champ fichier dans `ExamTemplate`)**: **implémenté**.
-- ⚠️ **(2) Extract auto + insert zones**: **partiellement implémenté** (extraction utilitaire présente, mais pas branchée à un endpoint/workflow persistant).
-- ❌ **(3) GET preview zones**: **non implémenté** (aucune route dédiée détectée).
-- ❌ **(4) PATCH/PUT ajustement + validate**: **non implémenté côté API** (modèle DB prêt mais pas d'endpoint).
-- ⚠️ **(5) Audit/versioning**: **partiellement implémenté** (tables/modèles présents, pas de logique applicative trouvée pour écrire les révisions).
+- ✅ **(1) Upload template (lié à `exam_version`)**: implémenté.
+- ✅ **(2) Extraction auto + insertion des zones**: implémenté (`/templates/{id}/zones/extract`) avec metadata extracteur.
+- ✅ **(3) Preview zones**: implémenté (`GET /templates/{id}/zones`) avec champs d’audit.
+- ✅ **(4) Ajustement manuel + validation**: implémenté (PATCH/PUT zone, bulk PATCH, validate global, reset).
+- ✅ **(5) Audit/versioning des zones**: implémenté via `TemplateZoneRevision`.
+- ✅ **(6) Service alignement PR3**: implémenté (ORB + fallback AKAZE/ECC + rotation + score + observabilité).
+- ✅ **(7) Pipeline V2 PR4 (feature-flagged)**: implémenté (template → alignement → zones → OCR par zone + matrice de statut).
 
 ## Détails
 
-### 1) Upload template
+### Templates/Zones (PR2)
 
-- Route API présente: `POST /api/exams/versions/{version_id}/templates`.
-- Upload multipart (`UploadFile`), validations PDF/content-type, hash SHA-256, stockage, insertion `ExamTemplate`, activation optionnelle via `active_template_id`.
-- Champs fichier (`original_filename`, `storage_url`, `content_type`, `file_size`) présents dans le modèle `ExamTemplate`.
-- Tests unitaires présents pour succès + validation content-type.
+- Upload template: `POST /api/exams/versions/{version_id}/templates`.
+- Extraction + persistence zones: `POST /api/exams/templates/{template_id}/zones/extract`.
+- Preview zones: `GET /api/exams/templates/{template_id}/zones`.
+- Update zone unitaire: `PATCH/PUT /api/exams/templates/{template_id}/zones/{zone_id}`.
+- Update zone batch: `PATCH /api/exams/templates/{template_id}/zones`.
+- Validation globale: `POST /api/exams/templates/{template_id}/zones/validate`.
+- Reset zones: `POST /api/exams/templates/{template_id}/zones/reset`.
+- Révisions: création d’entrées `TemplateZoneRevision` sur extraction/update/validation.
 
-### 2) Extract auto + insert zones
+### Alignement (PR3)
 
-- Fonction d'extraction PDF disponible (`extract_template_zones_from_pdf`) via PyMuPDF.
-- **Aucun appel** détecté vers cette fonction dans les routes/services.
-- Conclusion: extraction candidate existe mais **pas intégrée** à un flux complet "extract + insert zones".
+- Service: `backend/app/ml/alignment_service.py`.
+- Stratégie: ORB primaire, fallback AKAZE, fallback final ECC.
+- Rotations testées: `[0, 90, 180, 270]`.
+- Métadonnées persistées sur `Submission`:
+  - `alignment_score`,
+  - `alignment_method`,
+  - `alignment_rotation`.
+- Observabilité:
+  - logs structurés (keypoints, inliers, méthode retenue),
+  - overlay debug optionnel (upload artifact).
 
-### 3) GET preview zones
+### Pipeline V2 (PR4)
 
-- Aucune route `/zones` ou `/preview` liée aux templates/zones détectée dans l'API examens.
-- Le seul `preview` détecté est côté GDPR retention mode, non lié aux zones de template.
-
-### 4) PATCH/PUT ajustement + validate
-
-- Champs de validation/édition existent dans `TemplateZone` (`is_validated`, `validated_at`, `validated_by`, `last_edited_*`, `edit_source`).
-- Mais aucune route `PATCH`/`PUT` dédiée aux zones détectée dans l'API.
-
-### 5) Audit/versioning
-
-- Modèle `TemplateZoneRevision` + migration DB de création de table présents.
-- **Pas de logique applicative trouvée** (service/router) qui crée des lignes de révision lors d'éditions/validations.
+- Feature flag: `pipeline_v2_enabled` (config).
+- Flux V2:
+  1. chargement template actif,
+  2. split pages,
+  3. alignement page/template,
+  4. OCR par zone (`extract_text_from_crop`),
+  5. création `AnswerBlock` avec `question_key`.
+- OCR par zone:
+  - crop bbox,
+  - prétraitement léger (grayscale + adaptive threshold),
+  - détection zone vide via `ink_ratio` pour éviter OCR inutile.
+- Matrice de statut:
+  - `ERROR` si alignement impossible,
+  - `PROCESSED` si seuils alignement/couverture satisfaits,
+  - `NEEDS_REVIEW` sinon.
+- Compatibilité descendante:
+  - pipeline legacy conservé,
+  - worker ne force `PROCESSED` que si le pipeline n’a pas déjà fixé un autre statut.
 
 ## Conclusion opérationnelle
 
-Le socle data est avancé (templates, zones, validation, révisions), mais l'API métier autour des zones est incomplète. En l'état:
-
-- prêt pour upload template,
-- non prêt pour un workflow complet de zones (auto-extract persisté, preview, ajustement/validation, audit effectif).
+Le socle template/zone + alignement + pipeline V2 est désormais en place côté backend, avec rollback via feature flag et observabilité alignement.
