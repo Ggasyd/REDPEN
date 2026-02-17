@@ -1,14 +1,12 @@
 """Complete submission processing pipeline (legacy + template-first V2)."""
 
 import logging
-from collections import defaultdict
 from uuid import UUID
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.config import settings
-from app.ml.alignment_service import AlignmentResult, alignment_service
+from app.ml.alignment_service import alignment_service
 from app.ml.detection_service import detection_service
 from app.ml.ocr_service import ocr_service
 from app.ml.vision_service import vision_service
@@ -49,119 +47,41 @@ async def process_submission_pipeline_v2(submission: Submission, db: AsyncSessio
     """Template-first pipeline: template -> alignment -> zones -> OCR by zone."""
     pages = await split_pdf_to_pages(submission, db)
 
-    template_context = await _load_template_context(submission, db)
-    if template_context is None:
-        logger.warning(
-            {
-                "event": "pipeline_v2_template_missing",
-                "submission_id": str(submission.id),
-            }
-        )
-        await process_submission_pipeline_v1(submission, db)
-        return
-
-    questions_result = await db.execute(
-        select(Question)
-        .where(Question.exam_version_id == submission.exam_version_id)
-        .order_by(Question.order_index)
+    # Load active template (if configured)
+    template_bytes = None
+    result = await db.execute(
+        select(ExamVersion).where(ExamVersion.id == submission.exam_version_id)
     )
-    questions = questions_result.scalars().all()
-    question_by_key = {
-        _normalize_question_key(question.question_number): question
-        for question in questions
-    }
+    exam_version = result.scalar_one_or_none()
+    if exam_version and exam_version.active_template_id:
+        from app.models import ExamTemplate
 
-    total_zones = 0
-    processed_zones = 0
-    blank_zones = 0
-    successful_alignments = 0
-    failed_alignments = 0
+        template_result = await db.execute(
+            select(ExamTemplate).where(
+                ExamTemplate.id == exam_version.active_template_id
+            )
+        )
+        template = template_result.scalar_one_or_none()
+        if template:
+            try:
+                template_bytes = storage.download_file(template.storage_url)
+            except Exception as e:
+                print(f"Warning: Could not download template {template.id}: {e}")
+
+    # Step 2-4: Process each page
     alignment_scores: list[float] = []
-    best_alignment: AlignmentResult | None = None
-
     for page in pages:
-        page_index = max(0, page.page_number - 1)
-        zones = template_context["zones_by_page"].get(page_index, [])
-        total_zones += len(zones)
-
-        page_bytes = storage.download_file(page.storage_url)
-        template_page_bytes = template_context["template_pages"].get(page_index)
-
-        aligned_page_bytes = page_bytes
-        alignment_result = None
-        if template_page_bytes:
-            alignment_result = alignment_service.align_to_template(
-                submission_page_bytes=page_bytes,
-                template_page_bytes=template_page_bytes,
-            )
-            alignment_scores.append(alignment_result.score)
-            if alignment_result.success:
-                successful_alignments += 1
-            else:
-                failed_alignments += 1
-            if best_alignment is None or alignment_result.score > best_alignment.score:
-                best_alignment = alignment_result
-            aligned_page_bytes = alignment_result.aligned_image_bytes or page_bytes
-
-        for zone in zones:
-            crop = await ocr_service.extract_text_from_crop(
-                aligned_page_bytes,
-                bbox={
-                    "x": zone.bbox_x,
-                    "y": zone.bbox_y,
-                    "width": zone.bbox_width,
-                    "height": zone.bbox_height,
-                },
-                preprocessing=True,
-            )
-            processed_zones += 1
-            if crop["is_blank"]:
-                blank_zones += 1
-
-            normalized_key = _normalize_question_key(zone.question_key)
-            question = question_by_key.get(normalized_key)
-
-            block = AnswerBlock(
-                page_id=page.id,
-                question_id=question.id if question else None,
-                question_key=zone.question_key,
-                block_type=BlockType.TEXT,
-                assign_method=AssignMethod.GEOMETRIC,
-                bbox_x=zone.bbox_x,
-                bbox_y=zone.bbox_y,
-                bbox_width=zone.bbox_width,
-                bbox_height=zone.bbox_height,
-                transcription=crop.get("text", ""),
-                crop_url="",
-                confidence=crop.get("confidence", 0.0),
-                is_illegible=crop.get("is_blank", False),
-                needs_review=(crop.get("confidence", 0.0) < 0.7)
-                or crop.get("is_blank", False),
-                metadata_json={
-                    "pipeline": "v2",
-                    "ink_ratio": crop.get("ink_ratio", 0.0),
-                    "is_blank": crop.get("is_blank", False),
-                    "alignment_method": alignment_result.method
-                    if alignment_result
-                    else "none",
-                    "alignment_score": alignment_result.score
-                    if alignment_result
-                    else 0.0,
-                },
-            )
-            db.add(block)
+        page_alignment = await align_submission_page(page, submission, template_bytes)
+        if page_alignment is not None:
+            alignment_scores.append(page_alignment.score)
+        await process_page(page, submission, db)
 
     if alignment_scores:
-        submission.alignment_score = max(alignment_scores)
-    if best_alignment:
-        submission.alignment_method = best_alignment.method
-        submission.alignment_rotation = best_alignment.rotation
+        best_alignment = max(alignment_scores)
+        submission.alignment_score = best_alignment
 
-    coverage_ratio = processed_zones / max(total_zones, 1)
-    blank_ratio = blank_zones / max(total_zones, 1)
-    alignment_average = (
-        sum(alignment_scores) / len(alignment_scores) if alignment_scores else 0.0
-    )
+    # Step 5: Assign student
+    await assign_student_to_submission(submission, db)
 
     if total_zones > 0 and successful_alignments == 0:
         submission.status = SubmissionStatus.ERROR
@@ -344,14 +264,7 @@ async def align_submission_page(
     try:
         page_bytes = storage.download_file(page.storage_url)
     except Exception as e:
-        logger.warning(
-            {
-                "event": "alignment_page_download_failed",
-                "submission_id": str(submission.id),
-                "page_id": str(page.id),
-                "error": str(e),
-            }
-        )
+        print(f"Warning: Could not download page {page.id} for alignment: {e}")
         submission.alignment_method = "none"
         submission.alignment_rotation = 0
         submission.alignment_score = 0.0
@@ -365,18 +278,6 @@ async def align_submission_page(
     submission.alignment_score = result.score
     submission.alignment_method = result.method
     submission.alignment_rotation = result.rotation
-
-    logger.info(
-        {
-            "event": "alignment_page_result",
-            "submission_id": str(submission.id),
-            "page_id": str(page.id),
-            "method": result.method,
-            "rotation": result.rotation,
-            "score": round(result.score, 4),
-            "success": result.success,
-        }
-    )
 
     return result
 
