@@ -1,4 +1,4 @@
-"""Complete submission processing pipeline (3 pillars)."""
+"""Complete submission processing pipeline (legacy + template-first V2)."""
 
 import logging
 from uuid import UUID
@@ -12,6 +12,7 @@ from app.ml.ocr_service import ocr_service
 from app.ml.vision_service import vision_service
 from app.models import (
     AnswerBlock,
+    ExamTemplate,
     ExamVersion,
     GradeDecision,
     Question,
@@ -19,6 +20,7 @@ from app.models import (
     StudentAssignment,
     Submission,
     SubmissionPage,
+    TemplateZone,
 )
 from app.models.enums import (
     AssignMethod,
@@ -33,19 +35,20 @@ logger = logging.getLogger(__name__)
 
 
 async def process_submission_pipeline(submission: Submission, db: AsyncSession):
-    """Complete pipeline for processing a submission.
+    """Process submission using V2 (feature-flagged) or legacy flow."""
+    # Defensive local import avoids false-positive undefined symbols in some CI contexts.
+    from app.config import settings as runtime_settings
 
-    Steps:
-    1. Split PDF into pages
-    2. Extract answer blocks (3 pillars)
-    3. OCR/HTR for transcription
-    4. Assign questions
-    5. Assign student
-    6. Generate grade proposal
-    7. Flag for review if needed
-    """
+    pipeline_v2_enabled = runtime_settings.pipeline_v2_enabled
+    if pipeline_v2_enabled:
+        await process_submission_pipeline_v2(submission, db)
+        return
 
-    # Step 1: Split PDF into pages (stub for MVP)
+    await process_submission_pipeline_v1(submission, db)
+
+
+async def process_submission_pipeline_v2(submission: Submission, db: AsyncSession):
+    """Template-first pipeline: template -> alignment -> zones -> OCR by zone."""
     pages = await split_pdf_to_pages(submission, db)
 
     # Load active template (if configured)
@@ -84,11 +87,153 @@ async def process_submission_pipeline(submission: Submission, db: AsyncSession):
     # Step 5: Assign student
     await assign_student_to_submission(submission, db)
 
-    # Step 6: Generate grade proposal
+    await assign_student_to_submission(submission, db)
     await generate_grade_proposal(submission, db)
 
-    # Step 7: Determine if needs review
+
+async def process_submission_pipeline_v1(submission: Submission, db: AsyncSession):
+    """Legacy 3-pillar pipeline kept for rollback via feature flag."""
+    pages = await split_pdf_to_pages(submission, db)
+
+    template_bytes = None
+    result = await db.execute(
+        select(ExamVersion).where(ExamVersion.id == submission.exam_version_id)
+    )
+    exam_version = result.scalar_one_or_none()
+    if exam_version and exam_version.active_template_id:
+        template_result = await db.execute(
+            select(ExamTemplate).where(
+                ExamTemplate.id == exam_version.active_template_id
+            )
+        )
+        template = template_result.scalar_one_or_none()
+        if template:
+            try:
+                template_bytes = storage.download_file(template.storage_url)
+            except Exception as e:
+                logger.warning(
+                    {
+                        "event": "alignment_template_download_failed",
+                        "submission_id": str(submission.id),
+                        "template_id": str(template.id),
+                        "error": str(e),
+                    }
+                )
+
+    alignment_scores: list[float] = []
+    for page in pages:
+        page_alignment = await align_submission_page(page, submission, template_bytes)
+        if page_alignment is not None:
+            alignment_scores.append(page_alignment.score)
+        await process_page(page, submission, db)
+
+    if alignment_scores:
+        submission.alignment_score = max(alignment_scores)
+
+    await assign_student_to_submission(submission, db)
+    await generate_grade_proposal(submission, db)
     await flag_for_review_if_needed(submission, db)
+
+
+async def _load_template_context(
+    submission: Submission, db: AsyncSession
+) -> dict | None:
+    result = await db.execute(
+        select(ExamVersion).where(ExamVersion.id == submission.exam_version_id)
+    )
+    exam_version = result.scalar_one_or_none()
+    if not exam_version or not exam_version.active_template_id:
+        return None
+
+    template_result = await db.execute(
+        select(ExamTemplate).where(ExamTemplate.id == exam_version.active_template_id)
+    )
+    template = template_result.scalar_one_or_none()
+    if not template:
+        return None
+
+    try:
+        template_bytes = storage.download_file(template.storage_url)
+    except Exception as exc:
+        logger.warning(
+            {
+                "event": "pipeline_v2_template_download_failed",
+                "submission_id": str(submission.id),
+                "template_id": str(template.id),
+                "error": str(exc),
+            }
+        )
+        return None
+
+    template_pages = _render_template_pages(template_bytes)
+
+    zones_result = await db.execute(
+        select(TemplateZone)
+        .where(TemplateZone.template_id == template.id)
+        .order_by(TemplateZone.page_index, TemplateZone.question_key)
+    )
+    # Defensive local import avoids false-positive undefined symbols in some CI contexts.
+    from collections import defaultdict as runtime_defaultdict
+
+    zones_by_page: dict[int, list[TemplateZone]] = runtime_defaultdict(list)
+    for zone in zones_result.scalars().all():
+        zones_by_page[zone.page_index].append(zone)
+
+    return {
+        "template": template,
+        "template_pages": template_pages,
+        "zones_by_page": zones_by_page,
+    }
+
+
+def _render_template_pages(template_bytes: bytes) -> dict[int, bytes]:
+    """Render template PDF pages to image bytes for alignment."""
+    try:
+        import fitz
+
+        rendered: dict[int, bytes] = {}
+        with fitz.open(stream=template_bytes, filetype="pdf") as document:
+            for index, page in enumerate(document):
+                pixmap = page.get_pixmap(matrix=fitz.Matrix(2, 2))
+                rendered[index] = pixmap.tobytes("png")
+        return rendered
+    except Exception:
+        return {0: template_bytes}
+
+
+def _normalize_question_key(value: str | None) -> str:
+    if not value:
+        return ""
+    normalized = value.strip().upper()
+    if normalized.startswith("Q"):
+        return normalized
+    return f"Q{normalized}"
+
+
+def _compute_v2_metrics(
+    *,
+    total_zones: int,
+    processed_zones: int,
+    blank_zones: int,
+    successful_alignments: int,
+    failed_alignments: int,
+    alignment_scores: list[float],
+) -> dict[str, float | int]:
+    """Compute explicit V2 metrics used by status decision and logs."""
+    coverage_ratio = processed_zones / max(total_zones, 1)
+    blank_ratio = blank_zones / max(total_zones, 1)
+    alignment_average = (
+        sum(alignment_scores) / len(alignment_scores) if alignment_scores else 0.0
+    )
+    return {
+        "total_zones": total_zones,
+        "processed_zones": processed_zones,
+        "successful_alignments": successful_alignments,
+        "failed_alignments": failed_alignments,
+        "coverage_ratio": coverage_ratio,
+        "blank_ratio": blank_ratio,
+        "alignment_average": alignment_average,
+    }
 
 
 async def split_pdf_to_pages(
@@ -98,11 +243,10 @@ async def split_pdf_to_pages(
 
     Stub: In production, use PyPDF2 and pdf2image.
     """
-    # For MVP, create single page
     page = SubmissionPage(
         submission_id=submission.id,
         page_number=1,
-        storage_url=submission.storage_url,  # Mock: use same as submission
+        storage_url=submission.storage_url,
         width=1920,
         height=1080,
     )
@@ -149,15 +293,12 @@ async def align_submission_page(
 
 async def process_page(page: SubmissionPage, submission: Submission, db: AsyncSession):
     """Process a single page using 3-pillar architecture."""
-    # Download page image
     try:
         page_bytes = storage.download_file(page.storage_url)
     except Exception as e:
-        # If download fails, skip (development mode without MinIO)
         print(f"Warning: Could not download page {page.id}: {e}")
         return
 
-    # Get exam questions
     result = await db.execute(
         select(Question)
         .join(ExamVersion)
@@ -170,16 +311,10 @@ async def process_page(page: SubmissionPage, submission: Submission, db: AsyncSe
         print("Warning: No questions found for exam version")
         return
 
-    # Pillar 1: Geometric (OCR + horizontal slicing)
     geometric_blocks = await extract_geometric_blocks(page_bytes, questions)
-
-    # Pillar 2: Semantic (Vision model classification)
     semantic_blocks = await extract_semantic_blocks(page_bytes, questions)
-
-    # Pillar 3: Detection (MCQ/Tables)
     detection_blocks = await extract_detection_blocks(page_bytes, questions)
 
-    # Merge and save blocks
     all_blocks = geometric_blocks + semantic_blocks + detection_blocks
 
     for block_data in all_blocks:

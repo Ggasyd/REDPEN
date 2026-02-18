@@ -1,6 +1,6 @@
-# Vérification des 5 fonctionnalités templates/zones
+# Vérification des fonctionnalités templates/zones + alignement + pipeline V2
 
-Date: 2026-02-10
+Date: 2026-02-17
 
 ## Résumé
 
@@ -12,7 +12,50 @@ Date: 2026-02-10
 
 ## Détails
 
-### 1) Upload template
+### Templates/Zones (PR2)
+
+- Upload template: `POST /api/exams/versions/{version_id}/templates`.
+- Extraction + persistence zones: `POST /api/exams/templates/{template_id}/zones/extract`.
+- Preview zones: `GET /api/exams/templates/{template_id}/zones`.
+- Update zone unitaire: `PATCH/PUT /api/exams/templates/{template_id}/zones/{zone_id}`.
+- Update zone batch: `PATCH /api/exams/templates/{template_id}/zones`.
+- Validation globale: `POST /api/exams/templates/{template_id}/zones/validate`.
+- Reset zones: `POST /api/exams/templates/{template_id}/zones/reset`.
+- Révisions: création d’entrées `TemplateZoneRevision` sur extraction/update/validation.
+
+### Alignement (PR3)
+
+- Service: `backend/app/ml/alignment_service.py`.
+- Stratégie: ORB primaire, fallback AKAZE, fallback final ECC.
+- Rotations testées: `[0, 90, 180, 270]`.
+- Métadonnées persistées sur `Submission`:
+  - `alignment_score`,
+  - `alignment_method`,
+  - `alignment_rotation`.
+- Observabilité:
+  - logs structurés (keypoints, inliers, méthode retenue),
+  - overlay debug optionnel (upload artifact).
+
+### Pipeline V2 (PR4)
+
+- Feature flag: `pipeline_v2_enabled` (config).
+- Flux V2:
+  1. chargement template actif,
+  2. split pages,
+  3. alignement page/template,
+  4. OCR par zone (`extract_text_from_crop`),
+  5. création `AnswerBlock` avec `question_key`.
+- OCR par zone:
+  - crop bbox,
+  - prétraitement léger (grayscale + adaptive threshold),
+  - détection zone vide via `ink_ratio` pour éviter OCR inutile.
+- Matrice de statut:
+  - `ERROR` si alignement impossible,
+  - `PROCESSED` si seuils alignement/couverture satisfaits,
+  - `NEEDS_REVIEW` sinon.
+- Compatibilité descendante:
+  - pipeline legacy conservé,
+  - worker ne force `PROCESSED` que si le pipeline n’a pas déjà fixé un autre statut.
 
 - Route API présente: `POST /api/exams/versions/{version_id}/templates`.
 - Upload multipart (`UploadFile`), validations PDF/content-type, hash SHA-256, stockage, insertion `ExamTemplate`, activation optionnelle via `active_template_id`.
@@ -40,12 +83,11 @@ Date: 2026-02-10
 - En cas de changement, une révision est écrite (`change_type="update"`).
 - Test unitaire présent sur mise à jour + validation + création de révision.
 
-### 5) Audit/versioning
 
 - Modèle `TemplateZoneRevision` présent et relié à `TemplateZone`.
 - Fonction `_create_zone_revision(...)` implémentée pour incrémenter `revision_number` et persister un snapshot complet des données de zone.
 - Cette fonction est appelée dans les workflows d'extraction (`extract_insert`) et de mise à jour (`update`), ce qui couvre l'audit/versioning applicatif.
 
-## Conclusion opérationnelle
+Pour éviter les écarts de contexte (chemin ou env) sur la PR4, utiliser le script:
 
 Les 5 fonctionnalités demandées sont bien implémentées côté API + modèle de données, avec des tests ciblés pour les cas critiques (upload, extract+preview, update+validate+revision).
